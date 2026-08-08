@@ -1,0 +1,13 @@
+[project]
+name = "flare"
+version = "0.1.0"
+description = "Incident Response AI assistant"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mypy>=2.3.0",
+    "pre-commit>=4.6.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.2",
+]
