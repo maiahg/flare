@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -30,6 +31,10 @@ class InvestigationPoster(Protocol):
     ) -> None: ...
 
 
+class RunSuperseded(Exception):
+    """Raised at a checkpoint when newer context has replaced this run"""
+
+
 @dataclass
 class GraphDeps:
     llm: LLMClient
@@ -41,12 +46,33 @@ class GraphDeps:
     budget_started: float
     dashboard_url: str = ""
     poster: InvestigationPoster | None = None
+    #: Checked at each checkpoint; truthy → abandon the run as superseded.
+    cancelled: Callable[[], Awaitable[bool]] | None = None
 
 
-def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGraph
-    """Assemble + compile the initial investigation graph for one run."""
+#: Graph node name -> read-agent class, in fan-out order.
+READ_AGENTS = {
+    "telemetry": TelemetryAgent,
+    "deploy": DeployAgent,
+    "code": CodeAgent,
+    "impact": ImpactAgent,
+}
+
+
+def build_investigation_graph(
+    deps: GraphDeps, *, read_agents: Sequence[str] | None = None
+):  # noqa: ANN201 - langgraph CompiledGraph
+    """Assemble + compile an investigation graph for one run."""
+    selected = [n for n in (read_agents or list(READ_AGENTS)) if n in READ_AGENTS]
+
+    async def checkpoint() -> None:
+        """Abort between nodes if this run has been superseded."""
+        if deps.cancelled is not None and await deps.cancelled():
+            raise RunSuperseded
 
     async def extract_context(state: RunState) -> RunState:
+        if state.get("plan"):
+            return {"revision_count": 0}
         trigger = state.get("trigger", {})
         plan = {
             "service": "checkout-api",
@@ -62,6 +88,7 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
         return {}
 
     async def _read_node(state: RunState, agent_cls, name: str, seq: int) -> RunState:
+        await checkpoint()
         async with deps.semaphore:
             async with deps.recorder.agent_step(name, seq) as step:
                 agent = agent_cls(deps.llm, step.broker, model=deps.models.default)
@@ -83,6 +110,7 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
         return await _read_node(state, ImpactAgent, "ImpactAgent", 4)
 
     async def gather_join(state: RunState) -> RunState:
+        await checkpoint()
         tool_calls = await deps.recorder.count_tool_calls()
         elapsed = time.monotonic() - deps.budget_started
         limit = budget_exceeded(
@@ -95,10 +123,7 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
         return out
 
     async def hypothesis(state: RunState) -> RunState:
-        # On a retry the critic's objections are already in state (we only reach
-        # here again via `revise`, i.e. after a failed verdict). Feeding them
-        # back is what makes the retry differ — otherwise the agent re-runs an
-        # identical prompt and the critic rejects it identically.
+        await checkpoint()
         verdict = state.get("critic_verdict")
         critique = (
             verdict.reasons if verdict is not None and not verdict.passed else None
@@ -140,6 +165,7 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
         return {"revision_count": state.get("revision_count", 0) + 1}
 
     async def commit_node(state: RunState) -> RunState:
+        await checkpoint()
         verdict = state.get("critic_verdict")
         extra: list[str] = []
         if verdict is not None and not verdict.passed:
@@ -185,13 +211,18 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
             return "revise"
         return "commit"
 
+    node_impls = {
+        "telemetry": telemetry,
+        "deploy": deploy,
+        "code": code,
+        "impact": impact,
+    }
+
     g: StateGraph = StateGraph(RunState)
     g.add_node("extract_context", extract_context)
     g.add_node("post_intent", post_intent)
-    g.add_node("telemetry", telemetry)
-    g.add_node("deploy", deploy)
-    g.add_node("code", code)
-    g.add_node("impact", impact)
+    for read_name in selected:
+        g.add_node(read_name, node_impls[read_name])
     g.add_node("gather_join", gather_join)
     g.add_node("hypothesis", hypothesis)
     g.add_node("summarizer", summarizer)
@@ -203,9 +234,12 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
 
     g.add_edge(START, "extract_context")
     g.add_edge("extract_context", "post_intent")
-    for read_name in ("telemetry", "deploy", "code", "impact"):
-        g.add_edge("post_intent", read_name)
-        g.add_edge(read_name, "gather_join")
+    if selected:
+        for read_name in selected:
+            g.add_edge("post_intent", read_name)
+            g.add_edge(read_name, "gather_join")
+    else:
+        g.add_edge("post_intent", "gather_join")
     g.add_conditional_edges(
         "gather_join",
         route_after_gather,
@@ -224,3 +258,8 @@ def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGr
     g.add_edge("persist_run", END)
 
     return g.compile(checkpointer=MemorySaver())
+
+
+def build_initial_graph(deps: GraphDeps): 
+    """The initial graph: full fan-out over all four read agents."""
+    return build_investigation_graph(deps)

@@ -10,7 +10,7 @@ from flare.models.claims import TimelineEntry
 from flare.models.core import INCIDENT_MODES, INCIDENT_SEVERITIES, Incident
 from flare.slack.incident_ops import adopt_or_create_incident, get_workspace_by_team
 from flare.slack.posting import SlackPoster, post_incident_card
-from flare.worker.enqueue import enqueue_initial_run
+from flare.worker.enqueue import enqueue_adaptive_run, enqueue_initial_run
 
 _TIMELINE_N = 10
 
@@ -44,12 +44,17 @@ async def handle(
         return await _handle_start(
             cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
         )
+    if cmd.action in ("investigate", "validate"):
+        return await _handle_investigate(
+            cmd.action, cmd.args, channel_id=channel_id, user_id=user_id
+        )
     if cmd.action == "mode":
         return await _handle_mode(cmd.args, channel_id=channel_id)
     if cmd.action == "timeline":
         return await _handle_timeline(channel_id=channel_id)
     return _ephemeral(
         "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
+        "`/flare investigate <what>`, `/flare validate <claim>`, "
         "`/flare mode <quiet|scribe|assist|active>`, or `/flare timeline`"
     )
 
@@ -107,7 +112,7 @@ async def _handle_start(
         thread_ts = await post_incident_card(
             SlackPoster(), channel=channel_id, title=parsed.title, severity=parsed.severity
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - don't fail the command on a posting error
         thread_ts = None
 
     await enqueue_initial_run(
@@ -123,6 +128,45 @@ async def _handle_start(
         }
     )
     return _ephemeral(f"Started investigation for *{parsed.title}*. Investigating…")
+
+
+async def _handle_investigate(
+    action: str, args: list[str], *, channel_id: str, user_id: str | None
+) -> dict[str, str]:
+    """`/flare investigate|validate <text>` — the rule floor's explicit ask"""
+    focus = " ".join(args).strip()
+    async with get_sessionmaker()() as session:
+        incident = await session.scalar(
+            select(Incident).where(Incident.slack_channel_id == channel_id)
+        )
+        if incident is None:
+            return _ephemeral(
+                "No flare incident is tracking this channel. Try `/flare start`."
+            )
+        incident_id = incident.id
+
+    await enqueue_adaptive_run(
+        {
+            "incident_id": str(incident_id),
+            "created_by": user_id or "system",
+            "trigger": {
+                "reason": f"flare_{action}",
+                "command": f"/flare {action}",
+                "user_id": user_id,
+                "messages": [{"text": focus, "user_id": user_id}],
+                "signals": [
+                    {
+                        "type": "command",
+                        "text": focus or f"/flare {action}",
+                        "novel": True,
+                        "category": "command",
+                        "reason": "explicit human request",
+                    }
+                ],
+            },
+        }
+    )
+    return _ephemeral(f"On it — {action}ing{f' *{focus}*' if focus else ''}…")
 
 
 async def _handle_mode(args: list[str], *, channel_id: str) -> dict[str, str]:

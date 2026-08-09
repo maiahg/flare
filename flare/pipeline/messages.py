@@ -6,8 +6,10 @@ from typing import Any, Mapping, TypedDict
 
 from sqlalchemy import select
 
+from flare.adaptive.novelty import load_memory_view
 from flare.agents.scribe import ScribeAgent
 from flare.agents.schemas import ExtractedSignal
+from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.events.outbox import commit_and_publish
 from flare.llm import get_llm_client
@@ -15,6 +17,8 @@ from flare.memory import MemoryRepository
 from flare.models.claims import Decision, Fact, OpenQuestion, TimelineEntry
 from flare.models.ingestion import SlackMessage
 from flare.pipeline.mapping import plan_claims
+from flare.pipeline.triage import triage_message
+from flare.worker.enqueue import enqueue_adaptive_run
 
 _logger = logging.getLogger("flare.pipeline")
 
@@ -30,7 +34,7 @@ class _Envelope(TypedDict):
 
 
 async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
-    """arq job: Slack message -> signals -> provenance-tagged claims."""
+    """arq job: Slack message -> signals -> claims -> adaptive trigger decision."""
     incident_id = uuid.UUID(payload["incident_id"])
     slack_ts = payload.get("slack_ts")
     text = payload["text"]
@@ -51,7 +55,7 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
 
         # ---- Scribe: persist message + signals
         scribe = ScribeAgent(get_llm_client())
-        _message, signal_rows = await scribe.run(
+        message, signal_rows = await scribe.run(
             session,
             incident_id=incident_id,
             slack_ts=slack_ts,
@@ -60,7 +64,6 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
             raw=payload.get("raw"),
         )
 
-        # ---- project signals -> claims, write via the memory repo
         extracted = [
             ExtractedSignal(
                 signal_type=r.signal_type or "",
@@ -69,6 +72,12 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
             )
             for r in signal_rows
         ]
+
+        memory_view = await load_memory_view(
+            session, incident_id, exclude_message_id=message.id
+        )
+
+        # ---- project signals -> claims, write via the memory repo
         plan = plan_claims(text, extracted)
         repo = MemoryRepository(session)
 
@@ -90,6 +99,30 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
         for d in plan.decisions:
             await repo.create(Decision, **common, **d)
 
+        # ---- adaptive triage: novelty -> trigger decision -> coalesce window
+        triage = await triage_message(
+            session,
+            get_llm_client(),
+            incident_id=incident_id,
+            message_id=message.id,
+            slack_ts=slack_ts,
+            user_id=user_id,
+            text=text,
+            extracted=extracted,
+            memory_view=memory_view,
+            signal_rows=signal_rows,
+        )
+
         # ---- commit, THEN publish the queued SSE events
         await commit_and_publish(session)
-    return "ok"
+
+    if triage.opened_window:
+        await enqueue_adaptive_run(
+            {"incident_id": str(incident_id), "created_by": "adaptive"},
+            defer_by=get_settings().adaptive.coalesce_window_s,
+        )
+    _logger.info(
+        "message triaged",
+        extra={"decision": triage.decision, "score": triage.score},
+    )
+    return f"ok:{triage.decision}"

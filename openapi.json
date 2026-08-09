@@ -84,9 +84,8 @@
         "tags": [
           "slack"
         ],
-        "summary": "Slack Commands",
-        "description": "Slash command endpoint (``/flare``). ACKs ephemerally; no work yet.",
-        "operationId": "slack_commands_slack_commands_post",
+        "summary": "Slack Commands Route",
+        "operationId": "slack_commands_route_slack_commands_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -97,7 +96,7 @@
                     "type": "string"
                   },
                   "type": "object",
-                  "title": "Response Slack Commands Slack Commands Post"
+                  "title": "Response Slack Commands Route Slack Commands Post"
                 }
               }
             }
@@ -1035,6 +1034,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/triggers": {
+      "get": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "List Triggers",
+        "description": "Trigger decisions for an incident, newest first (\u00a77.4).\n\nIncludes ``skip`` decisions on purpose: the suppressed ones are exactly\nwhat you want to audit when the bot felt too quiet or too noisy.",
+        "operationId": "list_triggers_api_v1_incidents__incident_id__triggers_get",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Decision"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TriggerRead"
+                  },
+                  "title": "Response List Triggers Api V1 Incidents  Incident Id  Triggers Get"
                 }
               }
             }
@@ -3890,6 +3965,91 @@
           "created_at"
         ],
         "title": "ToolCallRead"
+      },
+      "TriggerRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Incident Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "reasons": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasons"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "incident_id",
+          "created_at"
+        ],
+        "title": "TriggerRead",
+        "description": "One trigger decision, with the reasons that produced it.\n\nExposed because \"why did/didn't the bot investigate that message?\" has to\nbe answerable without reading logs \u2014 the reasons list carries both the\nnovelty verdicts and any classifier commentary."
       },
       "ValidationError": {
         "properties": {

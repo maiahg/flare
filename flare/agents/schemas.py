@@ -33,3 +33,14 @@ class SummaryOutput(BaseModel):
 class CriticOutput(BaseModel):
     passed: bool
     reasons: list[str] = Field(default_factory=list)
+
+class TriggerOutput(BaseModel):
+    decision: str = Field(description="one of: trigger, skip, batch")
+    reasons: list[str] = Field(default_factory=list)
+
+class PlannerOutput(BaseModel):
+    agents: list[str] = Field(
+        default_factory=list,
+        description="subset of the offered candidate agents that is worth running",
+    )
+    focus: str = Field(default="", description="one sentence: what to look at and why")

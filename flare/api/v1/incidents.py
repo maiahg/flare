@@ -24,6 +24,7 @@ from flare.api.v1.schemas import (
     OpenQuestionRead,
     PostmortemDraftRead,
     RevisionRead,
+    TriggerRead,
     RunDetail,
     RunRead,
     SummaryRead,
@@ -47,6 +48,7 @@ from flare.models.claims import (
     TimelineEntry,
 )
 from flare.models.core import Incident
+from flare.models.ingestion import Trigger
 from flare.models.tracing import AgentTrace, InvestigationRun, ToolCall
 
 router = APIRouter(tags=["incidents"])
@@ -378,6 +380,21 @@ async def get_run_detail(
             parent.tool_calls.append(ToolCallRead.model_validate(call))
     detail.agent_traces = [trace_payloads[t.id] for t in traces]
     return detail
+
+
+@router.get("/incidents/{incident_id}/triggers", response_model=list[TriggerRead])
+async def list_triggers(
+    incident: IncidentDep,
+    session: SessionDep,
+    decision: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> Sequence[Trigger]:
+    """Trigger decisions for an incident, newest first"""
+    stmt = select(Trigger).where(Trigger.incident_id == incident.id)
+    if decision is not None:
+        stmt = stmt.where(Trigger.decision == decision)
+    stmt = stmt.order_by(Trigger.created_at.desc()).limit(limit)
+    return (await session.scalars(stmt)).all()
 
 
 # ---- audit -----------------------------------------------------------------

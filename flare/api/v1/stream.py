@@ -67,7 +67,7 @@ async def event_stream(incident_id: uuid.UUID) -> AsyncIterator[str]:
     responses={
         200: {
             "content": {"text/event-stream": {}},
-            "description": "Live incident events (§4.4).",
+            "description": "Live incident events.",
         }
     },
 )

@@ -99,6 +99,13 @@ class InvestigationSlackPoster:
             self._channel, "\n".join(lines), thread_ts=self._thread_ts
         )
         await self._announce("findings")
+    
+    async def post_raw(self, text: str) -> None:
+        """Post an already-composed line (used for the governor's overflow nudge)."""
+        if not can_post_proactively(self._mode):
+            return
+        await self._poster.post_message(self._channel, text, thread_ts=self._thread_ts)
+        await self._announce("nudge")
 
     async def _announce(self, kind: str) -> None:
         try:

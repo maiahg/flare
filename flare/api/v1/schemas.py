@@ -12,7 +12,6 @@ class ORMModel(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class ProvenanceEnvelope(ORMModel):
     """The fields every claim carries."""
 
@@ -28,10 +27,6 @@ class ProvenanceEnvelope(ORMModel):
     created_at: datetime
     updated_at: datetime
 
-
-# ---- incidents -------------------------------------------------------------
-
-
 class IncidentSummaryCounts(BaseModel):
     """Per-entity counts shown on the overview header."""
 
@@ -43,7 +38,6 @@ class IncidentSummaryCounts(BaseModel):
     action_items: int = 0
     timeline_entries: int = 0
     mitigation_options: int = 0
-
 
 class IncidentRead(ORMModel):
     id: uuid.UUID
@@ -64,7 +58,6 @@ class IncidentRead(ORMModel):
     created_at: datetime
     updated_at: datetime
 
-
 class SummaryRead(ORMModel):
     id: uuid.UUID
     incident_id: uuid.UUID
@@ -75,20 +68,14 @@ class SummaryRead(ORMModel):
     created_at: datetime
     updated_at: datetime
 
-
 class IncidentDetail(IncidentRead):
     """Overview payload: the incident, its current summary, and counts."""
 
     summary: SummaryRead | None = None
     counts: IncidentSummaryCounts
 
-
-# ---- claims ----------------------------------------------------------------
-
-
 class FactRead(ProvenanceEnvelope):
     statement: str | None = None
-
 
 class EvidenceRead(ProvenanceEnvelope):
     title: str | None = None
@@ -100,7 +87,6 @@ class EvidenceRead(ProvenanceEnvelope):
     tool_call_id: uuid.UUID | None = None
     staleness_at: datetime | None = None
 
-
 class HypothesisRead(ProvenanceEnvelope):
     statement: str | None = None
     rank: int | None = None
@@ -108,12 +94,10 @@ class HypothesisRead(ProvenanceEnvelope):
     supporting_evidence: list[EvidenceRead] = Field(default_factory=list)
     contradicting_evidence: list[EvidenceRead] = Field(default_factory=list)
 
-
 class OpenQuestionRead(ProvenanceEnvelope):
     question: str | None = None
     owner_user_id: uuid.UUID | None = None
     answer: str | None = None
-
 
 class DecisionRead(ProvenanceEnvelope):
     statement: str | None = None
@@ -121,18 +105,15 @@ class DecisionRead(ProvenanceEnvelope):
     decided_at: datetime | None = None
     rationale: str | None = None
 
-
 class ActionItemRead(ProvenanceEnvelope):
     description: str | None = None
     owner_user_id: uuid.UUID | None = None
     due_at: datetime | None = None
 
-
 class TimelineEntryRead(ProvenanceEnvelope):
     occurred_at: datetime | None = None
     entry_type: str | None = None
     description: str | None = None
-
 
 class MitigationOptionRead(ProvenanceEnvelope):
     title: str | None = None
@@ -142,12 +123,10 @@ class MitigationOptionRead(ProvenanceEnvelope):
     expected_benefit: str | None = None
     approval_required: bool | None = None
 
-
 class CommsDraftRead(ProvenanceEnvelope):
     audience: str | None = None
     body: str | None = None
     version: int | None = None
-
 
 class PostmortemDraftRead(ORMModel):
     id: uuid.UUID
@@ -158,10 +137,6 @@ class PostmortemDraftRead(ORMModel):
     created_by: str | None = None
     created_at: datetime
     updated_at: datetime
-
-
-# ---- runs ------------------------------------------------------------------
-
 
 class ToolCallRead(ORMModel):
     id: uuid.UUID
@@ -181,7 +156,6 @@ class ToolCallRead(ORMModel):
     error: str | None = None
     created_at: datetime
 
-
 class AgentTraceRead(ORMModel):
     id: uuid.UUID
     run_id: uuid.UUID
@@ -200,7 +174,6 @@ class AgentTraceRead(ORMModel):
     created_at: datetime
     tool_calls: list[ToolCallRead] = Field(default_factory=list)
 
-
 class RunRead(ORMModel):
     id: uuid.UUID
     incident_id: uuid.UUID
@@ -218,15 +191,22 @@ class RunRead(ORMModel):
     created_by: str | None = None
     created_at: datetime
 
-
 class RunDetail(RunRead):
     """A run plus its agent traces and the tool calls beneath them."""
 
     agent_traces: list[AgentTraceRead] = Field(default_factory=list)
 
+class TriggerRead(ORMModel):
+    """One trigger decision, with the reasons that produced it."""
 
-# ---- audit -----------------------------------------------------------------
-
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    message_id: uuid.UUID | None = None
+    decision: str | None = None
+    score: float | None = None
+    reasons: dict[str, Any] | None = None
+    run_id: uuid.UUID | None = None
+    created_at: datetime
 
 class RevisionRead(ORMModel):
     id: uuid.UUID

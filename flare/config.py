@@ -29,6 +29,10 @@ class LLMModelSettings(BaseModel):
     scribe: str = DEFAULT_FAST_MODEL
     trigger: str = DEFAULT_FAST_MODEL
     default: str = DEFAULT_FAST_MODEL
+    hypothesis: str = DEFAULT_REASONING_MODEL
+    critic: str = DEFAULT_REASONING_MODEL
+    summarizer: str = DEFAULT_REASONING_MODEL
+    planner: str = DEFAULT_FAST_MODEL
 
 class LangfuseSettings(BaseModel):
     enabled: bool = False
@@ -43,6 +47,42 @@ class LLMSettings(BaseModel):
     max_repair_attempts: int = 1
     rate_limit: LLMRateLimitSettings = LLMRateLimitSettings()
 
+class RunBudgetSettings(BaseModel):
+    """Per-run investigation budget."""
+
+    max_tokens: int = 120_000
+    max_tool_calls: int = 40
+    max_wall_clock_s: int = 90
+    fan_out_concurrency: int = 4
+    max_critic_revisions: int = 2
+
+
+class ToolBrokerSettings(BaseModel):
+    """Tool Broker cache + rate-limit tunables."""
+
+    cache_ttl_s: int = 60
+    rate_limit_per_min: int = 60
+    call_timeout_s: int = 15
+
+class AdaptiveSettings(BaseModel):
+    """Trigger scoring + debounce/coalesce tunables"""
+
+    trigger_threshold: float = 0.5
+    batch_threshold: float = 0.2
+    coalesce_window_s: int = 30
+    pending_ttl_s: int = 600
+    max_coalesced_signals: int = 50
+
+
+class GovernorSettings(BaseModel):
+    """Anti-spam governor budget + dedup tunables"""
+
+    post_budget: int = 6
+    post_window_s: int = 900
+    dedup_ttl_s: int = 1800
+    dedup_similarity: float = 0.85
+    dedup_history: int = 20
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_nested_delimiter="__", case_sensitive=False, extra="ignore")
 
@@ -52,6 +92,10 @@ class Settings(BaseSettings):
 
     slack: SlackSettings
     llm: LLMSettings = LLMSettings()
+    run_budget: RunBudgetSettings = RunBudgetSettings()
+    tool_broker: ToolBrokerSettings = ToolBrokerSettings()
+    adaptive: AdaptiveSettings = AdaptiveSettings()
+    governor: GovernorSettings = GovernorSettings()
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

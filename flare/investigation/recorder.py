@@ -131,6 +131,16 @@ class RunRecorder:
                 if step.provider_request_id:
                     self._last_provider_request_id = step.provider_request_id
 
+    async def save_plan(self, plan: dict[str, Any]) -> None:
+        """Persist the run's plan so the dashboard can show why these agents ran."""
+        assert self.run_id is not None
+        async with self._sm() as session:
+            run = await session.get(InvestigationRun, self.run_id)
+            if run is None:  
+                return
+            run.plan = plan
+            await session.commit()
+
     async def count_tool_calls(self) -> int:
         assert self.run_id is not None
         async with self._sm() as session:

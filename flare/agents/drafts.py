@@ -35,7 +35,7 @@ class HypothesisDraft(BaseModel):
 
 
 class CriticVerdict(BaseModel):
-    """The safety gate's decision (§7.3 / §11.6)."""
+    """The safety gate's decision"""
 
     passed: bool
     reasons: list[str] = Field(default_factory=list)

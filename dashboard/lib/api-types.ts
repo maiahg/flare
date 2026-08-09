@@ -797,7 +797,7 @@ export interface components {
         };
         /**
          * IncidentDetail
-         * @description Overview payload: the incident, its current summary, and counts (§4.2).
+         * @description Overview payload: the incident, its current summary, and counts.
          */
         IncidentDetail: {
             /**
@@ -1126,7 +1126,7 @@ export interface components {
         };
         /**
          * RunDetail
-         * @description A run plus its agent traces and the tool calls beneath them (§4.2).
+         * @description A run plus its agent traces and the tool calls beneath them.
          */
         RunDetail: {
             /**
@@ -2037,7 +2037,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Live incident events (§4.4). */
+            /** @description Live incident events. */
             200: {
                 headers: {
                     [name: string]: unknown;
