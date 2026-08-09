@@ -32,6 +32,6 @@ class Settings(BaseSettings):
     slack: SlackSettings
     llm_provider: LLMProviderSettings
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()

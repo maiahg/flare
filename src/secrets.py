@@ -4,7 +4,7 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import SecretStr
 
-from flare.config import Settings, get_settings
+from src.config import Settings, get_settings
 
 SLACK_SIGNING_SECRET = "slack.signing_secret"
 SLACK_CLIENT_SECRET = "slack.client_secret"
