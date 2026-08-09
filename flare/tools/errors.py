@@ -15,3 +15,7 @@ class RateLimitedToolError(ToolError):
 
 class ToolTimeoutError(ToolError):
     """Raised internally when an adapter exceeds the call timeout."""
+
+
+class MutatingToolError(ToolError):
+    """Raised when something tries to mount an adapter that can change the world.

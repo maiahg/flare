@@ -12,11 +12,15 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from flare.config import get_settings
-from flare.llm.redaction import redact
+from flare.llm.redaction import redact, redact_value
 from flare.models.tracing import ToolCall
 from flare.redis import get_redis
-from flare.tools.errors import NotAllowlistedError, RateLimitedToolError
-from flare.tools.interface import ReadOnlyTool, ToolResult
+from flare.tools.errors import (
+    MutatingToolError,
+    NotAllowlistedError,
+    RateLimitedToolError,
+)
+from flare.tools.interface import ReadOnlyTool, ToolResult, read_only_violations
 
 _CACHE_PREFIX = "flare:toolcache:"
 _RATE_PREFIX = "flare:toolrate:"
@@ -24,11 +28,7 @@ _RATE_PREFIX = "flare:toolrate:"
 
 @dataclass(frozen=True)
 class BrokeredResult:
-    """What an agent gets back: the read plus the id of its audit row.
-
-    ``tool_call_id`` is what an :class:`~flare.agents.drafts.EvidenceDraft` must
-    cite so committed evidence is traceable to the exact call that produced it.
-    """
+    """What an agent gets back: the read plus the id of its audit row."""
 
     result: ToolResult
     tool_call_id: uuid.UUID
@@ -42,17 +42,23 @@ def _hash_args(name: str, args: dict[str, Any]) -> str:
 
 def _redact_args(args: dict[str, Any]) -> dict[str, Any]:
     """Redact string values (recursively) before hashing / persisting."""
+    redacted, _ = redact_value(args)
+    return dict(redacted)
 
-    def _r(value: Any) -> Any:
-        if isinstance(value, str):
-            return redact(value)
-        if isinstance(value, dict):
-            return {k: _r(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [_r(v) for v in value]
-        return value
 
-    return {k: _r(v) for k, v in args.items()}
+def _redact_result(result: ToolResult) -> tuple[ToolResult, dict[str, int]]:
+    """Scrub a tool result, returning it plus a count of what was replaced."""
+    data, data_hits = redact_value(result.data)
+    limitations, limit_hits = redact_value(result.limitations)
+    hits: dict[str, int] = dict(data_hits)
+    for key, count in limit_hits.items():
+        hits[key] = hits.get(key, 0) + count
+    if not hits:
+        return result, {}
+    return (
+        ToolResult(system=result.system, data=data, limitations=limitations),
+        hits,
+    )
 
 
 class ToolBroker:
@@ -89,6 +95,13 @@ class ToolBroker:
         if not isinstance(tool, ReadOnlyTool):
             raise TypeError(
                 f"{tool!r} is not a ReadOnlyTool (read-only enforced by construction)"
+            )
+        violations = read_only_violations(tool)
+        if violations:
+            raise MutatingToolError(
+                f"{type(tool).__name__} exposes mutating method(s) "
+                f"{', '.join(violations)}; the broker only mounts read-only "
+                "adapters"
             )
         self._registry[tool.name] = tool
 
@@ -132,6 +145,7 @@ class ToolBroker:
                 tool, redacted, args_hash, cached, status="cache_hit", latency_ms=0
             )
             return BrokeredResult(result=cached, tool_call_id=call_id, cached=True)
+            # (cached results were redacted before they were cached)
 
         await self._enforce_rate_limit(name)
 
@@ -142,7 +156,7 @@ class ToolBroker:
             result = await tool.read(**args)
         except Exception as exc:  # noqa: BLE001 - degrade, don't crash the graph
             status = "error"
-            error = str(exc)
+            error = redact(str(exc))
             result = ToolResult(
                 system=tool.system,
                 data={},
@@ -150,12 +164,20 @@ class ToolBroker:
             )
         latency_ms = int((time.monotonic() - started) * 1000)
 
+        result, redactions = _redact_result(result)
+
         if status == "ok":
             await self._cache_set(args_hash, result)
 
         call_id = await self._audit(
-            tool, redacted, args_hash, result, status=status, latency_ms=latency_ms,
+            tool,
+            redacted,
+            args_hash,
+            result,
+            status=status,
+            latency_ms=latency_ms,
             error=error,
+            redactions=redactions,
         )
         return BrokeredResult(result=result, tool_call_id=call_id, cached=False)
 
@@ -196,6 +218,7 @@ class ToolBroker:
         status: str,
         latency_ms: int,
         error: str | None = None,
+        redactions: dict[str, int] | None = None,
     ) -> uuid.UUID:
         now = datetime.now(UTC)
         call = ToolCall(
@@ -209,7 +232,7 @@ class ToolBroker:
             status=status,
             latency_ms=latency_ms,
             result_ref={"inline": result.data, "limitations": result.limitations},
-            redactions=None,
+            redactions=redactions or None,
             started_at=now,
             finished_at=now,
             error=error,

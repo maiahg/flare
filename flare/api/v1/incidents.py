@@ -397,7 +397,7 @@ async def list_triggers(
         stmt = stmt.where(Trigger.decision == decision)
     stmt = stmt.order_by(Trigger.created_at.desc()).limit(limit)
     return (await session.scalars(stmt)).all()
-    
+
 
 @router.get("/incidents/{incident_id}/approvals", response_model=list[ApprovalRead])
 async def list_incident_approvals(
@@ -429,5 +429,5 @@ async def list_revisions(
         stmt = stmt.where(MemoryRevision.entity_type == entity_type)
     if since is not None:
         stmt = stmt.where(MemoryRevision.created_at >= since)
-    stmt = stmt.order_by(MemoryRevision.created_at)
+    stmt = stmt.order_by(MemoryRevision.seq)
     return (await session.scalars(stmt)).all()

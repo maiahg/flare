@@ -1,9 +1,56 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
+MUTATING_METHOD_NAMES: frozenset[str] = frozenset(
+    {
+        "write",
+        "create",
+        "update",
+        "patch",
+        "put",
+        "post",
+        "delete",
+        "remove",
+        "destroy",
+        "drop",
+        "truncate",
+        "purge",
+        "apply",
+        "mutate",
+        "execute",
+        "run_command",
+        "exec",
+        "shell",
+        "rollback",
+        "revert",
+        "deploy",
+        "redeploy",
+        "restart",
+        "reboot",
+        "scale",
+        "resize",
+        "disable",
+        "enable",
+        "toggle",
+        "set",
+        "send",
+        "page",
+        "notify",
+        "publish",
+        "trigger",
+        "kill",
+        "terminate",
+        "drain",
+        "failover",
+        "flush",
+        "rotate",
+        "reset",
+    }
+)
 
 class ToolResult(BaseModel):
     """A typed, JSON-serializable read result plus degradation info."""

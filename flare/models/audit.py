@@ -4,7 +4,15 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import TIMESTAMP, ForeignKey, Index, String, Text
+from sqlalchemy import (
+    TIMESTAMP,
+    BigInteger,
+    ForeignKey,
+    Identity,
+    Index,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,7 +33,14 @@ class MemoryRevision(UUIDAuditMixin, Base):
     """An append-only journal entry for a mutation to a memory entity."""
 
     __tablename__ = "memory_revisions"
-    __table_args__ = (Index("ix_memory_revisions_entity", "entity_type", "entity_id"),)
+    __table_args__ = (
+        Index("ix_memory_revisions_entity", "entity_type", "entity_id"),
+        Index("ix_memory_revisions_entity_seq", "entity_type", "entity_id", "seq"),
+    )
+
+    seq: Mapped[int] = mapped_column(
+        BigInteger, Identity(always=True), nullable=False
+    )
 
     incident_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
