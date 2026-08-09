@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from flare.events.bus import EVENT_MEMORY_UPDATED, Event
 from flare.events.outbox import enqueue
+from flare.memory.authority import human_locked_fields, is_human_actor
 from flare.memory.errors import (
     EntityNotFoundError,
+    HumanAuthorityError,
     ImmutableFieldError,
     InvalidStatusError,
     ProvenanceError,
@@ -100,7 +102,7 @@ class MemoryRepository:
             await self._session.flush()
             after = snapshot(entity)
             self._journal(
-                model=model,
+                entity_type_name=entity_type(model),
                 entity_id=getattr(entity, "id"),
                 incident_id=incident_id,
                 op=OP_CREATE,
@@ -215,7 +217,7 @@ class MemoryRepository:
             raise ValueError("a claim cannot supersede itself")
 
         replacement = await self._session.scalar(
-            select(model).where(model.id == new_id) 
+            select(model).where(model.id == new_id)  # type: ignore[attr-defined]
         )
         if replacement is None:
             raise EntityNotFoundError(
@@ -254,6 +256,8 @@ class MemoryRepository:
         self._require_claim_model(model)
         self._validate_changes(model, changes)
 
+        await self._require_human_authority(model, entity_id, changes, actor)
+
         entity = await self._load_for_update(model, entity_id)
         incident_id = getattr(entity, "incident_id")
         if expect_incident_id is not None and incident_id != expect_incident_id:
@@ -274,7 +278,7 @@ class MemoryRepository:
                 return entity
 
             self._journal(
-                model=model,
+                entity_type_name=entity_type(model),
                 entity_id=entity_id,
                 incident_id=incident_id,
                 op=op,
@@ -286,6 +290,57 @@ class MemoryRepository:
             )
             await self._session.flush()
         return entity
+
+    async def record_change(
+        self,
+        *,
+        entity_type_name: str,
+        entity_id: uuid.UUID,
+        incident_id: uuid.UUID,
+        op: str,
+        before: dict[str, Any] | None,
+        after: dict[str, Any] | None,
+        actor: str,
+        run_id: uuid.UUID | None = None,
+        reason: str | None = None,
+    ) -> None:
+        """Journal a change to a **non-claim** entity (incident mode, drafts…)."""
+        with self._sanctioned():
+            self._journal(
+                entity_type_name=entity_type_name,
+                entity_id=entity_id,
+                incident_id=incident_id,
+                op=op,
+                before=before,
+                after=after,
+                actor=actor,
+                run_id=run_id,
+                reason=reason,
+            )
+            await self._session.flush()
+
+    async def _require_human_authority(
+        self,
+        model: type[Any],
+        entity_id: uuid.UUID,
+        changes: Mapping[str, Any],
+        actor: str | None,
+    ) -> None:
+        """Refuse an agent write over a field a human already decided."""
+        if is_human_actor(actor):
+            return
+        locked = await human_locked_fields(
+            self._session,
+            entity_type_name=entity_type(model),
+            entity_id=entity_id,
+        )
+        conflict = locked & set(changes)
+        if conflict:
+            raise HumanAuthorityError(
+                f"{model.__name__} {entity_id}: "
+                f"{', '.join(sorted(conflict))} was decided by a human; "
+                f"{actor or 'an agent'} may not overwrite it"
+            )
 
     async def _load_for_update(self, model: type[C], entity_id: uuid.UUID) -> C:
         """Row-lock the entity so concurrent mutations serialize."""
@@ -303,7 +358,7 @@ class MemoryRepository:
     def _journal(
         self,
         *,
-        model: type[Any],
+        entity_type_name: str,
         entity_id: uuid.UUID,
         incident_id: uuid.UUID,
         op: str,
@@ -314,10 +369,11 @@ class MemoryRepository:
         reason: str | None,
     ) -> None:
         """Append the revision row and queue its realtime event."""
+        effective_run_id = run_id if run_id is not None else self._run_id
         self._session.add(
             MemoryRevision(
                 incident_id=incident_id,
-                entity_type=entity_type(model),
+                entity_type=entity_type_name,
                 entity_id=entity_id,
                 op=op,
                 before=before,
@@ -334,7 +390,7 @@ class MemoryRepository:
                 event=EVENT_MEMORY_UPDATED,
                 incident_id=incident_id,
                 data={
-                    "entity_type": entity_type(model),
+                    "entity_type": entity_type_name,
                     "entity_id": str(entity_id),
                     "op": op,
                     "actor": actor,

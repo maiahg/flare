@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from flare.api import v1
+from flare.api.errors import install_error_handlers
 from flare.api.health import router as health_router
 from flare.api.middleware import RequestIdMiddleware
 from flare.db.session import reset_engine
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(RequestIdMiddleware)
+    install_error_handlers(app)
 
     app.include_router(health_router)
     app.include_router(slack_router)

@@ -267,6 +267,64 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Create Incident",
+        "description": "Open an incident (\u00a74.2).",
+        "operationId": "create_incident_api_v1_incidents_post",
+        "parameters": [
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/incidents/{incident_id}": {
@@ -745,6 +803,73 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Create Action Item",
+        "operationId": "create_action_item_api_v1_incidents__incident_id__action_items_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionItemCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionItemRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/incidents/{incident_id}/timeline": {
@@ -1208,6 +1333,745 @@
         }
       }
     },
+    "/api/v1/incidents/{incident_id}/mode": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Set Mode",
+        "description": "Set the behavior mode: quiet | scribe | assist | active (\u00a79.5).",
+        "operationId": "set_mode_api_v1_incidents__incident_id__mode_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/investigate": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Investigate",
+        "description": "Queue a manual, targeted, read-only run (\u00a74.3).\n\n202, not 200: the run executes on the worker. Returning only once it\nfinished would hold the request open for the whole investigation budget.",
+        "operationId": "investigate_api_v1_incidents__incident_id__investigate_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvestigateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/facts/{fact_id}": {
+      "patch": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Patch Fact",
+        "description": "Correct a fact's wording, or mark it stale/rejected.",
+        "operationId": "patch_fact_api_v1_incidents__incident_id__facts__fact_id__patch",
+        "parameters": [
+          {
+            "name": "fact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Fact Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/hypotheses/{hypothesis_id}": {
+      "patch": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Patch Hypothesis",
+        "description": "Confirm or reject a hypothesis (\u00a711.9: a rejection is permanent).",
+        "operationId": "patch_hypothesis_api_v1_incidents__incident_id__hypotheses__hypothesis_id__patch",
+        "parameters": [
+          {
+            "name": "hypothesis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Hypothesis Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HypothesisPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/evidence/{evidence_id}": {
+      "patch": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Patch Evidence",
+        "description": "Mark evidence stale \u2014 the only mutation an observation allows (\u00a73.3).",
+        "operationId": "patch_evidence_api_v1_incidents__incident_id__evidence__evidence_id__patch",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Evidence Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidencePatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/questions/{question_id}": {
+      "patch": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Patch Question",
+        "description": "Assign an owner, record an answer, or close a question.",
+        "operationId": "patch_question_api_v1_incidents__incident_id__questions__question_id__patch",
+        "parameters": [
+          {
+            "name": "question_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Question Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenQuestionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/action-items/{action_item_id}": {
+      "patch": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Patch Action Item",
+        "operationId": "patch_action_item_api_v1_incidents__incident_id__action_items__action_item_id__patch",
+        "parameters": [
+          {
+            "name": "action_item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Item Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionItemPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionItemRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/comms/{comms_id}/approve": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Approve Comms",
+        "description": "Approve a draft. Approval marks it approved; it never sends (\u00a711.2).",
+        "operationId": "approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post",
+        "parameters": [
+          {
+            "name": "comms_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Comms Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommsDraftRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/corrections": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Submit Correction",
+        "description": "Record a human correction; Scribe reconciles what it invalidates (\u00a74.3).",
+        "operationId": "submit_correction_api_v1_incidents__incident_id__corrections_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/postmortem/generate": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Generate Postmortem",
+        "description": "Generate (or regenerate) the postmortem draft from current memory.",
+        "operationId": "generate_postmortem_api_v1_incidents__incident_id__postmortem_generate_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostmortemDraftRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/incidents/{incident_id}/stream": {
       "get": {
         "tags": [
@@ -1251,6 +2115,74 @@
   },
   "components": {
     "schemas": {
+      "ActionItemCreate": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "ActionItemCreate"
+      },
+      "ActionItemPatch": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ActionItemPatch"
+      },
       "ActionItemRead": {
         "properties": {
           "id": {
@@ -1707,6 +2639,71 @@
         ],
         "title": "CommsDraftRead"
       },
+      "CorrectionCreate": {
+        "properties": {
+          "correction_text": {
+            "type": "string",
+            "title": "Correction Text"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "correction_text"
+        ],
+        "title": "CorrectionCreate"
+      },
+      "CorrectionResult": {
+        "properties": {
+          "fact": {
+            "$ref": "#/components/schemas/FactRead"
+          },
+          "invalidated": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Invalidated"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "fact"
+        ],
+        "title": "CorrectionResult",
+        "description": "What the correction recorded, and what it invalidated."
+      },
       "DecisionRead": {
         "properties": {
           "id": {
@@ -1863,6 +2860,21 @@
           "updated_at"
         ],
         "title": "DecisionRead"
+      },
+      "EvidencePatch": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "EvidencePatch",
+        "description": "Evidence accepts exactly one edit: marking it stale (\u00a73.3)."
       },
       "EvidenceRead": {
         "properties": {
@@ -2068,6 +3080,35 @@
         ],
         "title": "EvidenceRead"
       },
+      "FactPatch": {
+        "properties": {
+          "statement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statement"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FactPatch"
+      },
       "FactRead": {
         "properties": {
           "id": {
@@ -2203,6 +3244,35 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HypothesisPatch": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HypothesisPatch"
       },
       "HypothesisRead": {
         "properties": {
@@ -2362,6 +3432,66 @@
           "updated_at"
         ],
         "title": "HypothesisRead"
+      },
+      "IncidentCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "alert_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Payload"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "IncidentCreate"
       },
       "IncidentDetail": {
         "properties": {
@@ -2751,6 +3881,46 @@
         "title": "IncidentSummaryCounts",
         "description": "Per-entity counts shown on the overview header."
       },
+      "InvestigateRequest": {
+        "properties": {
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InvestigateRequest"
+      },
       "MitigationOptionRead": {
         "properties": {
           "id": {
@@ -2928,6 +4098,20 @@
           "updated_at"
         ],
         "title": "MitigationOptionRead"
+      },
+      "ModeUpdate": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ModeUpdate"
       },
       "OpenQuestionRead": {
         "properties": {
@@ -3151,6 +4335,47 @@
         ],
         "title": "PostmortemDraftRead"
       },
+      "QuestionPatch": {
+        "properties": {
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "QuestionPatch"
+      },
       "RevisionRead": {
         "properties": {
           "id": {
@@ -3262,6 +4487,48 @@
           "created_at"
         ],
         "title": "RevisionRead"
+      },
+      "RunAccepted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "queued"
+          },
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Incident Id"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "focus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id"
+        ],
+        "title": "RunAccepted",
+        "description": "A manual run was queued (it executes on the worker, not in-request)."
       },
       "RunDetail": {
         "properties": {

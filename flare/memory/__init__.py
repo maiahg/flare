@@ -1,5 +1,13 @@
+from flare.memory.authority import (
+    HUMAN_ACTOR_PREFIX,
+    human_actor,
+    human_rejected_statements,
+    is_human_actor,
+    is_human_rejected,
+)
 from flare.memory.errors import (
     EntityNotFoundError,
+    HumanAuthorityError,
     ImmutableFieldError,
     InvalidStatusError,
     MemoryStoreError,
@@ -21,7 +29,9 @@ from flare.memory.spec import (
 
 __all__ = [
     "CLAIM_MODELS",
+    "HUMAN_ACTOR_PREFIX",
     "EntityNotFoundError",
+    "HumanAuthorityError",
     "ImmutableFieldError",
     "InvalidStatusError",
     "MemoryRepository",
@@ -35,6 +45,10 @@ __all__ = [
     "ProvenanceError",
     "UnknownFieldError",
     "UnmanagedWriteError",
+    "human_actor",
+    "human_rejected_statements",
+    "is_human_actor",
+    "is_human_rejected",
     "install_write_guard",
     "remove_write_guard",
 ]

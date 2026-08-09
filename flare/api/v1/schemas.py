@@ -221,3 +221,68 @@ class RevisionRead(ORMModel):
     run_id: uuid.UUID | None = None
     reason: str | None = None
     created_at: datetime
+
+class WriteModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class IncidentCreate(WriteModel):
+    title: str
+    description: str | None = None
+    channel_id: str | None = None
+    alert_payload: dict[str, Any] | None = None
+    workspace_id: uuid.UUID | None = None
+
+class ModeUpdate(WriteModel):
+    mode: str
+
+class InvestigateRequest(WriteModel):
+    target: str | None = None
+    since: str | None = None
+    focus: str | None = None
+
+class FactPatch(WriteModel):
+    statement: str | None = None
+    status: str | None = None
+
+class HypothesisPatch(WriteModel):
+    status: str | None = None
+    rank: int | None = None
+
+class EvidencePatch(WriteModel):
+    """Evidence accepts exactly one edit: marking it stale."""
+
+    status: str
+
+class QuestionPatch(WriteModel):
+    owner_user_id: uuid.UUID | None = None
+    status: str | None = None
+    answer: str | None = None
+
+class ActionItemCreate(WriteModel):
+    description: str
+    owner_user_id: uuid.UUID | None = None
+    due_at: datetime | None = None
+
+class ActionItemPatch(WriteModel):
+    status: str | None = None
+    owner_user_id: uuid.UUID | None = None
+
+class CorrectionCreate(WriteModel):
+    correction_text: str
+    entity_type: str | None = None
+    entity_id: uuid.UUID | None = None
+
+class CorrectionResult(BaseModel):
+    """What the correction recorded, and what it invalidated."""
+
+    fact: FactRead
+    invalidated: list[dict[str, str]] = Field(default_factory=list)
+    note: str = ""
+
+class RunAccepted(BaseModel):
+    """A manual run was queued (it executes on the worker, not in-request)."""
+
+    status: str = "queued"
+    incident_id: uuid.UUID
+    target: str | None = None
+    focus: str | None = None

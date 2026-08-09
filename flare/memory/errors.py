@@ -24,6 +24,8 @@ class InvalidStatusError(MemoryStoreError):
 class EntityNotFoundError(MemoryStoreError):
     """No row exists for the requested model + id."""
 
+class HumanAuthorityError(MemoryStoreError):
+    """An agent tried to overwrite a field a human already decided."""
 
 class UnmanagedWriteError(MemoryStoreError):
     """A memory table was written outside the repository."""

@@ -44,3 +44,23 @@ class PlannerOutput(BaseModel):
         description="subset of the offered candidate agents that is worth running",
     )
     focus: str = Field(default="", description="one sentence: what to look at and why")
+
+class CorrectionPlan(BaseModel):
+    """Which existing claims a human correction invalidates."""
+
+    invalidates: list[int] = Field(
+        default_factory=list,
+        description="indices from the numbered CLAIMS list that the correction "
+        "contradicts; empty if the correction only adds new information",
+    )
+    note: str = Field(default="", description="one sentence explaining the change")
+
+class MitigationItem(BaseModel):
+    title: str
+    description: str = Field(description="what to do, concretely")
+    risk: str = Field(description="one of: low, medium, high")
+    reversibility: str = Field(description="one of: reversible, partially, irreversible")
+    expected_benefit: str = Field(description="what improves if this is applied")
+
+class MitigationOutput(BaseModel):
+    options: list[MitigationItem] = Field(default_factory=list)

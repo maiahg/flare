@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -8,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from flare.agents.drafts import CriticVerdict, EvidenceDraft, HypothesisDraft
 from flare.events.bus import EVENT_SUMMARY_UPDATED, Event
 from flare.events.outbox import commit_and_publish, enqueue
-from flare.memory import MemoryRepository
+from flare.memory import MemoryRepository, human_rejected_statements, is_human_rejected
 from flare.models.claims import Evidence, EvidenceLink, Hypothesis, Summary
+
+_logger = logging.getLogger("flare.investigation.commit")
 
 
 async def commit_memory(
@@ -27,6 +30,11 @@ async def commit_memory(
 
     async with sessionmaker() as session:
         repo = MemoryRepository(session, run_id=run_id)
+
+        rejected = await human_rejected_statements(
+            session, model=Hypothesis, incident_id=incident_id
+        )
+        suppressed = 0
 
         # 1) evidence — kind='fact' (a directly-observed measurement), citing the
         #    exact tool call that produced it.
@@ -56,6 +64,18 @@ async def commit_memory(
 
         # 2) hypotheses — kind='hypothesis'; apply any Critic confidence downgrade.
         for hdraft in hypotheses:
+            previously = is_human_rejected(hdraft.statement, rejected)
+            if previously is not None:
+                suppressed += 1
+                _logger.info(
+                    "suppressed re-proposal of a human-rejected hypothesis",
+                    extra={
+                        "incident_id": str(incident_id),
+                        "run_id": str(run_id),
+                        "rejected_statement": previously,
+                    },
+                )
+                continue
             likelihood = downgrade.get(str(hdraft.ref), hdraft.likelihood)
             hyp = await repo.create(
                 Hypothesis,
@@ -115,4 +135,8 @@ async def commit_memory(
 
         await commit_and_publish(session)
 
-    return {"evidence": len(evidence), "hypotheses": len(hypotheses)}
+    return {
+        "evidence": len(evidence),
+        "hypotheses": len(hypotheses) - suppressed,
+        "suppressed": suppressed,
+    }
