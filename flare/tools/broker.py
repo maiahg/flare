@@ -19,6 +19,7 @@ from flare.tools.errors import (
     MutatingToolError,
     NotAllowlistedError,
     RateLimitedToolError,
+    ToolArgsError,
 )
 from flare.tools.interface import ReadOnlyTool, ToolResult, read_only_violations
 
@@ -56,7 +57,12 @@ def _redact_result(result: ToolResult) -> tuple[ToolResult, dict[str, int]]:
     if not hits:
         return result, {}
     return (
-        ToolResult(system=result.system, data=data, limitations=limitations),
+        ToolResult(
+            system=result.system,
+            data=data,
+            limitations=limitations,
+            fetched_at=result.fetched_at,
+        ),
         hits,
     )
 
@@ -154,7 +160,9 @@ class ToolBroker:
         error: str | None = None
         try:
             result = await tool.read(**args)
-        except Exception as exc:  # noqa: BLE001 - degrade, don't crash the graph
+        except ToolArgsError:
+            raise
+        except Exception as exc:
             status = "error"
             error = redact(str(exc))
             result = ToolResult(

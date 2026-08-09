@@ -10,7 +10,23 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from flare.tools.broker import ToolBroker
-from flare.tools.interface import ReadOnlyTool, ToolResult
+from flare.tools.interface import BaseReadOnlyTool, ReadOnlyTool, ToolResult
+from flare.tools.specs import (
+    CODE_BLAME,
+    DEPLOY_DIFF,
+    FLAGS_AUDIT,
+    HISTORY_SEARCH,
+    LOGS_SEARCH,
+    METRICS_QUERY,
+    TRACES_QUERY,
+    CodeArgs,
+    DeployArgs,
+    FlagsArgs,
+    HistoryArgs,
+    LogsArgs,
+    MetricsArgs,
+    TracesArgs,
+)
 
 _SCENARIO_DIR = Path(__file__).parent / "scenarios"
 
@@ -25,108 +41,121 @@ def load_scenario(name: str = "db_latency_spike") -> dict[str, Any]:
     return data
 
 
-class _ScenarioTool:
+class _ScenarioTool(BaseReadOnlyTool):
     """Base for adapters bound to one scenario."""
-
-    name: str
-    system: str
 
     def __init__(self, scenario: dict[str, Any]) -> None:
         self._scenario = scenario
 
 
 class MetricsTool(_ScenarioTool):
-    name = "metrics.query"
-    system = "metrics"
+    spec = METRICS_QUERY
 
-    async def read(self, **args: Any) -> ToolResult:
-        service = args.get("service", "checkout-api")
-        metric = args.get("metric", "p99_ms")
-        series = self._scenario.get("metrics", {}).get(service, {}).get(metric, {})
+    async def fetch(self, args: MetricsArgs) -> ToolResult:
+        by_service = self._scenario.get("metrics", {})
+        if args.service not in by_service or args.metric not in by_service[args.service]:
+            return self.degraded_result(
+                f"no {args.metric} series recorded for {args.service}",
+                service=args.service,
+                metric=args.metric,
+                series={},
+            )
         return ToolResult(
             system=self.system,
-            data={"service": service, "metric": metric, "series": series},
+            data={
+                "service": args.service,
+                "metric": args.metric,
+                "series": by_service[args.service][args.metric],
+            },
         )
 
 
 class LogsTool(_ScenarioTool):
-    name = "logs.search"
-    system = "logs"
+    spec = LOGS_SEARCH
 
-    async def read(self, **args: Any) -> ToolResult:
-        query = str(args.get("query", "")).lower()
-        service = args.get("service")
+    async def fetch(self, args: LogsArgs) -> ToolResult:
+        if "logs" not in self._scenario:
+            return self.degraded_result("no log source available", matches=[])
+        query = args.query.lower()
         matches = [
             entry
             for entry in self._scenario.get("logs", [])
             if (not query or query in entry["text"].lower())
-            and (service is None or entry.get("service") == service)
-        ]
-        return ToolResult(system=self.system, data={"query": query, "matches": matches})
+            and (args.service is None or entry.get("service") == args.service)
+        ][: args.limit]
+        return ToolResult(
+            system=self.system, data={"query": query, "matches": matches}
+        )
 
 
 class TracesTool(_ScenarioTool):
-    name = "traces.query"
-    system = "traces"
+    spec = TRACES_QUERY
 
-    async def read(self, **args: Any) -> ToolResult:
-        window_minutes = int(args.get("window_minutes", 5))
-        traces = self._scenario.get("traces", {})
-        limitations: list[str] = []
+    async def fetch(self, args: TracesArgs) -> ToolResult:
+        if "traces" not in self._scenario:
+            return self.degraded_result("no trace source available", spans=[])
+        traces = self._scenario["traces"]
         cutoff = int(traces.get("available_after_minutes", 0))
-        if window_minutes > cutoff:
-            limitations.append(
-                f"trace sampling >{cutoff}m unavailable for a {window_minutes}m window"
+        if args.window_minutes > cutoff:
+            return self.degraded_result(
+                f"trace sampling >{cutoff}m unavailable for a "
+                f"{args.window_minutes}m window",
+                spans=[],
             )
-            return ToolResult(system=self.system, data={"spans": []}, limitations=limitations)
         return ToolResult(system=self.system, data={"spans": traces.get("spans", [])})
 
 
 class DeployTool(_ScenarioTool):
-    name = "deploy.diff"
-    system = "deploy"
+    spec = DEPLOY_DIFF
 
-    async def read(self, **args: Any) -> ToolResult:
-        deploy_id = args.get("deploy_id")
-        deploys = self._scenario.get("deploys", [])
-        if deploy_id is not None:
-            deploys = [d for d in deploys if str(d["id"]) == str(deploy_id)]
-        return ToolResult(system=self.system, data={"deploys": deploys})
+    async def fetch(self, args: DeployArgs) -> ToolResult:
+        if "deploys" not in self._scenario:
+            return self.degraded_result("no deploy source available", deploys=[])
+        deploys = self._scenario["deploys"]
+        if args.deploy_id is not None:
+            deploys = [d for d in deploys if str(d["id"]) == str(args.deploy_id)]
+        return ToolResult(system=self.system, data={"deploys": deploys[: args.limit]})
 
 
 class CodeTool(_ScenarioTool):
-    name = "code.blame"
-    system = "code"
+    spec = CODE_BLAME
 
-    async def read(self, **args: Any) -> ToolResult:
-        service = args.get("service", "payments-svc")
-        info = self._scenario.get("code", {}).get(service, {})
-        return ToolResult(system=self.system, data={"service": service, **info})
+    async def fetch(self, args: CodeArgs) -> ToolResult:
+        by_service = self._scenario.get("code", {})
+        if args.service not in by_service:
+            return self.degraded_result(
+                f"no code history recorded for {args.service}", commits=[]
+            )
+        return ToolResult(
+            system=self.system,
+            data={"service": args.service, **by_service[args.service]},
+        )
 
 
 class FlagsTool(_ScenarioTool):
-    name = "flags.audit"
-    system = "flags"
+    spec = FLAGS_AUDIT
 
-    async def read(self, **args: Any) -> ToolResult:
-        key = args.get("key")
-        flags = self._scenario.get("flags", [])
-        if key is not None:
-            flags = [f for f in flags if f["key"] == key]
+    async def fetch(self, args: FlagsArgs) -> ToolResult:
+        if "flags" not in self._scenario:
+            return self.degraded_result("no flag source available", flags=[])
+        flags = self._scenario["flags"]
+        if args.key is not None:
+            flags = [f for f in flags if f["key"] == args.key]
         return ToolResult(system=self.system, data={"flags": flags})
 
 
 class HistoryTool(_ScenarioTool):
-    name = "history.search"
-    system = "history"
+    spec = HISTORY_SEARCH
 
-    async def read(self, **args: Any) -> ToolResult:
-        query = str(args.get("query", "")).lower()
+    async def fetch(self, args: HistoryArgs) -> ToolResult:
+        if "history" not in self._scenario:
+            return self.degraded_result("no incident history available", entries=[])
+        query = args.query.lower()
         entries = [
             e
-            for e in self._scenario.get("history", [])
+            for e in self._scenario["history"]
             if not query or query in e.get("title", "").lower()
-        ]
+        ][: args.limit]
         return ToolResult(system=self.system, data={"entries": entries})
 
 
