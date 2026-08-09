@@ -10,6 +10,8 @@ ACTION_HYPOTHESIS_INVESTIGATE = "hypothesis:investigate"
 ACTION_HYPOTHESIS_EVIDENCE = "hypothesis:evidence"
 ACTION_QUESTION_ASSIGN = "question:assign"
 ACTION_QUESTION_ANSWERED = "question:answered"
+ACTION_APPROVAL_APPROVE = "approval:approve"
+ACTION_APPROVAL_REJECT = "approval:reject"
 
 INTERACTIVE_ACTIONS = frozenset(
     {
@@ -19,6 +21,8 @@ INTERACTIVE_ACTIONS = frozenset(
         ACTION_HYPOTHESIS_EVIDENCE,
         ACTION_QUESTION_ASSIGN,
         ACTION_QUESTION_ANSWERED,
+        ACTION_APPROVAL_APPROVE,
+        ACTION_APPROVAL_REJECT,
     }
 )
 
@@ -115,6 +119,64 @@ def question_card(
             ],
         },
     ]
+
+
+def mitigation_card(
+    *,
+    approval_id: uuid.UUID,
+    title: str,
+    description: str,
+    risk: str,
+    reversibility: str,
+    expected_benefit: str,
+    dashboard_url: str,
+    status: str = "proposed",
+    decided: str = "pending",
+) -> list[dict[str, Any]]:
+    """Approve · Reject for a proposed mitigation"""
+    value = str(approval_id)
+    blocks: list[dict[str, Any]] = [
+        _section(
+            f":shield: *Mitigation proposal*\n*{title}*\n{description}"
+        ),
+        {
+            "type": "section",
+            "fields": [
+                {"type": "mrkdwn", "text": f"*Risk:* {risk}"},
+                {"type": "mrkdwn", "text": f"*Reversibility:* {reversibility}"},
+                {"type": "mrkdwn", "text": f"*Expected benefit:* {expected_benefit}"},
+                {"type": "mrkdwn", "text": f"*Status:* {status}"},
+            ],
+        },
+    ]
+    if decided == "not required":
+        blocks.append(_section("_No approval required — this option changes nothing._"))
+    elif decided == "pending":
+        blocks.append(
+            {
+                "type": "actions",
+                "block_id": f"approval:{value}",
+                "elements": [
+                    _button("Approve", ACTION_APPROVAL_APPROVE, value, style="primary"),
+                    _button("Reject", ACTION_APPROVAL_REJECT, value, style="danger"),
+                ],
+            }
+        )
+    else:
+        blocks.append(_section(f"_Already {decided}._"))
+    blocks.append(
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": "Approval records the decision — Flare never applies a "
+                    f"mitigation. {_link(dashboard_url, 'Details →')}",
+                }
+            ],
+        }
+    )
+    return blocks
 
 
 def ephemeral(text: str, blocks: list[dict[str, Any]] | None = None) -> dict[str, Any]:

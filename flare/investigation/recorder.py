@@ -141,6 +141,16 @@ class RunRecorder:
             run.plan = plan
             await session.commit()
 
+    async def add_limitation(self, note: str) -> None:
+        """Append a note to an already-finished run."""
+        assert self.run_id is not None
+        async with self._sm() as session:
+            run = await session.get(InvestigationRun, self.run_id)
+            if run is None:  # pragma: no cover - defensive
+                return
+            run.limitations = [*(run.limitations or []), note]
+            await session.commit()
+
     async def count_tool_calls(self) -> int:
         assert self.run_id is not None
         async with self._sm() as session:

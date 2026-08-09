@@ -11,6 +11,8 @@ from flare.api.v1.schemas import (
     ActionItemCreate,
     ActionItemPatch,
     ActionItemRead,
+    ApprovalDecision,
+    ApprovalRead,
     CommsDraftRead,
     CorrectionCreate,
     CorrectionResult,
@@ -29,7 +31,9 @@ from flare.api.v1.schemas import (
     QuestionPatch,
     RunAccepted,
 )
+from flare.approvals import decide_approval
 from flare.llm import get_llm_client
+from flare.models.audit import Approval
 from flare.models.claims import (
     ActionItem,
     CommsDraft,
@@ -246,7 +250,27 @@ async def approve_comms(
     draft = await service.approve_comms(incident, comms_id)
     await service.commit(draft)
     return draft
+    
 
+@router.post(
+    "/incidents/{incident_id}/approvals/{approval_id}", response_model=ApprovalRead
+)
+async def decide(
+    incident: IncidentDep,
+    approval_id: uuid.UUID,
+    body: ApprovalDecision,
+    session: SessionDep,
+    actor: ActorDep,
+) -> Approval:
+    """Approve or reject a gated recommendation"""
+    return await decide_approval(
+        session,
+        actor,
+        incident=incident,
+        approval_id=approval_id,
+        decision=body.decision,
+        note=body.note,
+    )
 
 # ---- corrections + postmortem ----------------------------------------------
 

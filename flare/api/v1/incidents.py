@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from flare.api.v1.schemas import (
     ActionItemRead,
     AgentTraceRead,
+    ApprovalRead,
     CommsDraftRead,
     DecisionRead,
     EvidenceRead,
@@ -31,8 +32,9 @@ from flare.api.v1.schemas import (
     TimelineEntryRead,
     ToolCallRead,
 )
+from flare.approvals import list_approvals
 from flare.db.session import get_session
-from flare.models.audit import MemoryRevision
+from flare.models.audit import Approval, MemoryRevision
 from flare.models.claims import (
     ActionItem,
     CommsDraft,
@@ -395,6 +397,20 @@ async def list_triggers(
         stmt = stmt.where(Trigger.decision == decision)
     stmt = stmt.order_by(Trigger.created_at.desc()).limit(limit)
     return (await session.scalars(stmt)).all()
+    
+
+@router.get("/incidents/{incident_id}/approvals", response_model=list[ApprovalRead])
+async def list_incident_approvals(
+    incident: IncidentDep,
+    session: SessionDep,
+    approval_status: Annotated[str | None, Query(alias="status")] = None,
+) -> Sequence[Approval]:
+    """Approval requests, newest first.
+
+    Pending ones are the actionable list: each represents a branch of an
+    investigation waiting on a human (§7.6).
+    """
+    return await list_approvals(session, incident.id, status=approval_status)
 
 
 # ---- audit -----------------------------------------------------------------

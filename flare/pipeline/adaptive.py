@@ -46,10 +46,10 @@ async def _combine_with_superseded(
 
 async def _build_poster(
     incident_id: uuid.UUID, channel: str | None, mode: str
-) -> InvestigationPoster | None:
+) -> tuple[InvestigationPoster | None, InvestigationSlackPoster | None]:
     """A mode-gated, governor-wrapped poster, or None when we can't post."""
     if not channel:
-        return None
+        return None, None
     settings = get_settings()
     try:
         inner = InvestigationSlackPoster(
@@ -57,13 +57,13 @@ async def _build_poster(
         )
     except Exception: 
         _logger.warning("no Slack poster; running without channel posts")
-        return None
+        return None, None
 
     governor = AntiSpamGovernor(
         get_redis(), incident_id=incident_id, mode=mode, settings=settings.governor
     )
     delta = MemoryDelta(previous_top=await leading_hypothesis(incident_id))
-    return GovernedPoster(inner, governor, delta=delta)
+    return GovernedPoster(inner, governor, delta=delta), inner
 
 
 def _merge_explicit(trigger: dict[str, Any], explicit: dict[str, Any]) -> dict[str, Any]:
@@ -109,12 +109,13 @@ async def run_adaptive_investigation(ctx: dict, payload: dict[str, Any]) -> str:
         channel = incident.slack_channel_id if incident else None
         mode = incident.mode if incident else "assist"
 
-    poster = await _build_poster(incident_id, channel, mode)
+    poster, approval_poster = await _build_poster(incident_id, channel, mode)
     run_id = await start_adaptive_run(
         incident_id,
         trigger=trigger,
         created_by=payload.get("created_by", "adaptive"),
         scenario=payload.get("scenario", "db_latency_spike"),
         poster=poster,
+        approval_poster=approval_poster,
     )
     return str(run_id)

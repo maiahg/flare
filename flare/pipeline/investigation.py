@@ -39,5 +39,6 @@ async def run_initial_investigation(ctx: dict, payload: dict[str, Any]) -> str:
         created_by=payload.get("created_by", "system"),
         scenario=payload.get("scenario", "db_latency_spike"),
         poster=poster,
+        approval_poster=poster,
     )
     return str(run_id)

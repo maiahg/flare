@@ -32,10 +32,13 @@ class SlackPoster:
         text: str,
         *,
         thread_ts: str | None = None,
+        blocks: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"channel": channel, "text": text}
         if thread_ts is not None:
             payload["thread_ts"] = thread_ts
+        if blocks:
+            payload["blocks"] = blocks
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
                 _SLACK_POST_URL,
@@ -99,9 +102,18 @@ class InvestigationSlackPoster:
             self._channel, "\n".join(lines), thread_ts=self._thread_ts
         )
         await self._announce("findings")
-    
+
+    async def post_approval(
+        self, *, blocks: list[dict[str, Any]], text: str
+    ) -> None:
+        """Post an approval card"""
+        if not can_post_proactively(self._mode):
+            return
+        await self._poster.post_message(self._channel, text, blocks=blocks)
+        await self._announce("approval")
+
     async def post_raw(self, text: str) -> None:
-        """Post an already-composed line (used for the governor's overflow nudge)."""
+        """Post an already-composed line"""
         if not can_post_proactively(self._mode):
             return
         await self._poster.post_message(self._channel, text, thread_ts=self._thread_ts)
@@ -116,5 +128,5 @@ class InvestigationSlackPoster:
                     data={"kind": kind},
                 )
             )
-        except Exception:  # noqa: BLE001 - SSE hint, never fail the post
+        except Exception:
             _logger.debug("failed to publish slack.posted", exc_info=True)

@@ -33,6 +33,7 @@ class LLMModelSettings(BaseModel):
     critic: str = DEFAULT_REASONING_MODEL
     summarizer: str = DEFAULT_REASONING_MODEL
     planner: str = DEFAULT_FAST_MODEL
+    mitigation: str = DEFAULT_REASONING_MODEL
 
 class LangfuseSettings(BaseModel):
     enabled: bool = False
@@ -73,6 +74,11 @@ class AdaptiveSettings(BaseModel):
     pending_ttl_s: int = 600
     max_coalesced_signals: int = 50
 
+class MitigationSettings(BaseModel):
+    """Mitigation proposals + the approval gate"""
+
+    enabled: bool = True
+    max_options: int = 3
 
 class GovernorSettings(BaseModel):
     """Anti-spam governor budget + dedup tunables"""
@@ -96,6 +102,7 @@ class Settings(BaseSettings):
     tool_broker: ToolBrokerSettings = ToolBrokerSettings()
     adaptive: AdaptiveSettings = AdaptiveSettings()
     governor: GovernorSettings = GovernorSettings()
+    mitigation: MitigationSettings = MitigationSettings()
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

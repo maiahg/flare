@@ -3,7 +3,12 @@ from __future__ import annotations
 import operator
 from typing import Annotated, Any, TypedDict
 
-from flare.agents.drafts import CriticVerdict, EvidenceDraft, HypothesisDraft
+from flare.agents.drafts import (
+    CriticVerdict,
+    EvidenceDraft,
+    HypothesisDraft,
+    MitigationDraft,
+)
 from flare.config import RunBudgetSettings
 
 
@@ -20,6 +25,9 @@ class RunState(TypedDict, total=False):
     limitations: Annotated[list[str], operator.add]
     truncated: bool
     tool_call_count: int
+    mitigations: list[MitigationDraft]
+    pending_approvals: list[str]
+    approval_decision: dict[str, Any] | None
 
 
 def budget_exceeded(

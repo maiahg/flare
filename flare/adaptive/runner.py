@@ -15,12 +15,14 @@ from flare.agents.schemas import ExtractedSignal
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.investigation.graph import (
+    ApprovalPoster,
     GraphDeps,
     InvestigationPoster,
     RunSuperseded,
     build_investigation_graph,
 )
 from flare.investigation.recorder import RunRecorder
+from flare.investigation.resume import capture_interrupt
 from flare.investigation.state import RunState
 from flare.llm import get_llm_client
 from flare.models.claims import Hypothesis
@@ -72,6 +74,7 @@ async def start_adaptive_run(
     created_by: str = "system",
     scenario: str = "db_latency_spike",
     poster: InvestigationPoster | None = None,
+    approval_poster: ApprovalPoster | None = None,
     dashboard_url: str = "",
 ) -> uuid.UUID:
     """Plan and execute a targeted adaptive run; return the run id."""
@@ -121,6 +124,8 @@ async def start_adaptive_run(
         dashboard_url=dashboard_url,
         poster=poster,
         cancelled=cancelled,
+        mitigation=settings.mitigation,
+        approval_poster=approval_poster,
     )
     graph = build_investigation_graph(deps, read_agents=plan.agents)
 
@@ -135,10 +140,9 @@ async def start_adaptive_run(
         "revision_count": 0,
     }
 
+    config = {"configurable": {"thread_id": str(run_id)}}
     try:
-        await graph.ainvoke(
-            initial_state, config={"configurable": {"thread_id": str(run_id)}}
-        )
+        result = await graph.ainvoke(initial_state, config=config)
     except RunSuperseded:
         _logger.info("adaptive run %s superseded", run_id)
         await recorder.finish(
@@ -154,5 +158,8 @@ async def start_adaptive_run(
     finally:
         await supersede.clear_run(redis, incident_id, run_id)
         await supersede.clear_supersede(redis, run_id)
+
+    for _ in capture_interrupt(result, run_id, graph, config):
+        await recorder.add_limitation("mitigation branch awaiting human approval")
 
     return run_id

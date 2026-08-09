@@ -15,6 +15,8 @@ from flare.llm import get_llm_client
 from flare.models.claims import Evidence, EvidenceLink, Hypothesis
 from flare.models.core import Incident
 from flare.slack.blocks import (
+    ACTION_APPROVAL_APPROVE,
+    ACTION_APPROVAL_REJECT,
     ACTION_HYPOTHESIS_CONFIRM,
     ACTION_HYPOTHESIS_EVIDENCE,
     ACTION_HYPOTHESIS_INVESTIGATE,
@@ -22,6 +24,7 @@ from flare.slack.blocks import (
     ACTION_QUESTION_ANSWERED,
     ACTION_QUESTION_ASSIGN,
 )
+from flare.approvals import decide_approval
 from flare.slack.incident_ops import incident_for_channel, resolve_user
 from flare.steering import Actor, SteeringError, SteeringService, slack_actor
 from flare.worker.enqueue import enqueue_adaptive_run
@@ -186,6 +189,24 @@ async def _dispatch(
             "status": "answered",
             "entity_id": value,
             "text": ":white_check_mark: Question marked answered.",
+        }
+
+    if action_id in (ACTION_APPROVAL_APPROVE, ACTION_APPROVAL_REJECT):
+        decision = "approved" if action_id == ACTION_APPROVAL_APPROVE else "rejected"
+        approval = await decide_approval(
+            session,
+            actor,
+            incident=incident,
+            approval_id=uuid.UUID(value),
+            decision=decision,
+        )
+        return {
+            "status": approval.status,
+            "entity_id": value,
+            "text": (
+                f":shield: Mitigation *{approval.status}* — recorded as intent. "
+                "Flare does not apply mitigations."
+            ),
         }
 
     return {"status": "unknown_action", "text": f"Unsupported action {action_id}."}

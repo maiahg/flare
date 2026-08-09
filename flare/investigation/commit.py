@@ -6,11 +6,22 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from flare.agents.drafts import CriticVerdict, EvidenceDraft, HypothesisDraft
+from flare.agents.drafts import (
+    CriticVerdict,
+    EvidenceDraft,
+    HypothesisDraft,
+    MitigationDraft,
+)
 from flare.events.bus import EVENT_SUMMARY_UPDATED, Event
 from flare.events.outbox import commit_and_publish, enqueue
 from flare.memory import MemoryRepository, human_rejected_statements, is_human_rejected
-from flare.models.claims import Evidence, EvidenceLink, Hypothesis, Summary
+from flare.models.claims import (
+    Evidence,
+    EvidenceLink,
+    Hypothesis,
+    MitigationOption,
+    Summary,
+)
 
 _logger = logging.getLogger("flare.investigation.commit")
 
@@ -140,3 +151,33 @@ async def commit_memory(
         "hypotheses": len(hypotheses) - suppressed,
         "suppressed": suppressed,
     }
+
+async def commit_mitigations(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    *,
+    run_id: uuid.UUID,
+    incident_id: uuid.UUID,
+    drafts: list[MitigationDraft],
+) -> list[uuid.UUID]:
+    """Persist mitigation *proposals* and return their ids"""
+    ids: list[uuid.UUID] = []
+    async with sessionmaker() as session:
+        repo = MemoryRepository(session, run_id=run_id)
+        for draft in drafts:
+            row = await repo.create(
+                MitigationOption,
+                incident_id=incident_id,
+                kind="inference",
+                confidence=draft.confidence,
+                source={"type": "reasoning", "run_id": str(run_id)},
+                created_by=draft.created_by,
+                title=draft.title,
+                description=draft.description,
+                risk=draft.risk,
+                reversibility=draft.reversibility,
+                expected_benefit=draft.expected_benefit,
+                approval_required=draft.approval_required,
+            )
+            ids.append(row.id)
+        await commit_and_publish(session)
+    return ids

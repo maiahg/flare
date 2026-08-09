@@ -4,18 +4,22 @@ import asyncio
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
-from typing import Protocol
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import interrupt
 
 from flare.agents.critic import CriticAgent
 from flare.agents.hypothesis import HypothesisAgent
+from flare.agents.mitigation import MitigationAgent
 from flare.agents.read import CodeAgent, DeployAgent, ImpactAgent, TelemetryAgent
 from flare.agents.summarizer import SummarizerAgent
-from flare.config import LLMModelSettings, RunBudgetSettings
-from flare.investigation.commit import commit_memory
+from flare.approvals import SUBJECT_MITIGATION, create_approval
+from flare.config import LLMModelSettings, MitigationSettings, RunBudgetSettings
+from flare.events.outbox import commit_and_publish
+from flare.investigation.commit import commit_memory, commit_mitigation
 from flare.investigation.recorder import RunRecorder
 from flare.investigation.state import RunState, budget_exceeded
 from flare.llm import LLMClient
@@ -30,10 +34,16 @@ class InvestigationPoster(Protocol):
         self, *, summary: str | None, top_hypothesis: str | None, dashboard_url: str
     ) -> None: ...
 
+class ApprovalPoster(Protocol):
+    """Posts an approval card. Separate from findings: an approval request is a
+    needed human confirmation, which §9 lists as always worth a post."""
+
+    async def post_approval(
+        self, *, blocks: list[dict[str, Any]], text: str
+    ) -> None: ...
 
 class RunSuperseded(Exception):
     """Raised at a checkpoint when newer context has replaced this run"""
-
 
 @dataclass
 class GraphDeps:
@@ -48,6 +58,8 @@ class GraphDeps:
     poster: InvestigationPoster | None = None
     #: Checked at each checkpoint; truthy → abandon the run as superseded.
     cancelled: Callable[[], Awaitable[bool]] | None = None
+    mitigation: MitigationSettings = field(default_factory=MitigationSettings)
+    approval_poster: ApprovalPoster | None = None
 
 
 #: Graph node name -> read-agent class, in fan-out order.
@@ -61,7 +73,7 @@ READ_AGENTS = {
 
 def build_investigation_graph(
     deps: GraphDeps, *, read_agents: Sequence[str] | None = None
-):  # noqa: ANN201 - langgraph CompiledGraph
+): 
     """Assemble + compile an investigation graph for one run."""
     selected = [n for n in (read_agents or list(READ_AGENTS)) if n in READ_AGENTS]
 
@@ -200,8 +212,133 @@ def build_investigation_graph(
         )
         return {}
 
+    async def mitigate(state: RunState) -> RunState:
+        """Propose mitigation options."""
+        async with deps.recorder.agent_step("MitigationAgent", 8) as step:
+            agent = MitigationAgent(
+                deps.llm,
+                model=deps.models.mitigation,
+                max_options=deps.mitigation.max_options,
+            )
+            try:
+                drafts = await agent.run(
+                    evidence=state.get("evidence", []),
+                    hypotheses=state.get("hypotheses", []),
+                    summary=state.get("summary"),
+                )
+            except Exception as exc: 
+                step.error = str(exc)
+                drafts = []
+            step.output = {
+                "options": len(drafts),
+                "approval_required": sum(d.approval_required for d in drafts),
+            }
+            step.record_usage(agent.usage, fallback_model=deps.models.mitigation)
+            failure = step.error
+        if not drafts:
+            return {"limitations": [f"no mitigation options: {failure}"]} if failure else {}
+        option_ids = await commit_mitigations(
+            deps.sessionmaker,
+            run_id=uuid.UUID(state["run_id"]),
+            incident_id=uuid.UUID(state["incident_id"]),
+            drafts=drafts,
+        )
+        gated = [
+            str(option_id)
+            for option_id, draft in zip(option_ids, drafts, strict=True)
+            if draft.approval_required
+        ]
+        return {"mitigations": drafts, "pending_approvals": gated}
+
+    async def approval_gate(state: RunState) -> RunState:
+        """Block this branch on a human decision."""
+        gated = state.get("pending_approvals", [])
+        if not gated:
+            return {}
+
+        incident_id = uuid.UUID(state["incident_id"])
+        approvals: list[dict[str, str]] = []
+        async with deps.sessionmaker() as session:
+            for option_id in gated:
+                approval = await create_approval(
+                    session,
+                    incident_id=incident_id,
+                    subject_type=SUBJECT_MITIGATION,
+                    subject_id=uuid.UUID(option_id),
+                    requested_by="MitigationAgent",
+                    note=f"proposed by run {state['run_id']}",
+                )
+                approvals.append(
+                    {"approval_id": str(approval.id), "option_id": option_id}
+                )
+            await commit_and_publish(session)
+
+        if deps.approval_poster is not None:
+            await _post_approval_cards(state, approvals)
+
+        decision = interrupt(
+            {
+                "kind": "mitigation_approval",
+                "run_id": state["run_id"],
+                "approvals": approvals,
+            }
+        )
+        return {"approval_decision": dict(decision) if decision else None}
+
+    async def _post_approval_cards(
+        state: RunState, approvals: list[dict[str, str]]
+    ) -> None:
+        """Post one card per gated option (best effort; never fails the run)."""
+        from flare.slack.blocks import mitigation_card
+
+        drafts = {
+            option_id: draft
+            for option_id, draft in zip(
+                state.get("pending_approvals", []),
+                [d for d in state.get("mitigations", []) if d.approval_required],
+                strict=False,
+            )
+        }
+        for entry in approvals:
+            draft = drafts.get(entry["option_id"])
+            if draft is None or deps.approval_poster is None:
+                continue
+            try:
+                await deps.approval_poster.post_approval(
+                    blocks=mitigation_card(
+                        approval_id=uuid.UUID(entry["approval_id"]),
+                        title=draft.title,
+                        description=draft.description,
+                        risk=draft.risk,
+                        reversibility=draft.reversibility,
+                        expected_benefit=draft.expected_benefit,
+                        dashboard_url=deps.dashboard_url,
+                    ),
+                    text=f"Approval needed: {draft.title}",
+                )
+            except Exception:
+                pass
+
+    async def record_decision(state: RunState) -> RunState:
+        """Close the branch after a human decided"""
+        decision = state.get("approval_decision") or {}
+        if decision:
+            await deps.recorder.add_limitation(
+                f"mitigation {decision.get('decision', 'decided')} by a human "
+                "(recorded as intent; not applied)"
+            )
+        return {}
+
     def route_after_gather(state: RunState) -> str:
         return "commit" if state.get("truncated") else "hypothesis"
+
+   def route_mitigation(state: RunState) -> str:
+        """Propose mitigations only when there is a cause to mitigate."""
+        if not deps.mitigation.enabled:
+            return "end"
+        if state.get("truncated") or not state.get("hypotheses"):
+            return "end"
+        return "mitigate"
 
     def route_after_critic(state: RunState) -> str:
         verdict = state.get("critic_verdict")
@@ -231,6 +368,9 @@ def build_investigation_graph(
     g.add_node("commit_memory", commit_node)
     g.add_node("post_findings", post_findings)
     g.add_node("persist_run", persist_run)
+    g.add_node("mitigate", mitigate)
+    g.add_node("approval_gate", approval_gate)
+    g.add_node("record_decision", record_decision)
 
     g.add_edge(START, "extract_context")
     g.add_edge("extract_context", "post_intent")
@@ -256,6 +396,14 @@ def build_investigation_graph(
     g.add_edge("commit_memory", "post_findings")
     g.add_edge("post_findings", "persist_run")
     g.add_edge("persist_run", END)
+    g.add_conditional_edges(
+        "persist_run",
+        route_mitigation,
+        {"mitigate": "mitigate", "end": END},
+    )
+    g.add_edge("mitigate", "approval_gate")
+    g.add_edge("approval_gate", "record_decision")
+    g.add_edge("record_decision", END)
 
     return g.compile(checkpointer=MemorySaver())
 

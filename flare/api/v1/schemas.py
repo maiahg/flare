@@ -222,6 +222,19 @@ class RevisionRead(ORMModel):
     reason: str | None = None
     created_at: datetime
 
+class ApprovalRead(ORMModel):
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    subject_type: str | None = None
+    subject_id: uuid.UUID | None = None
+    requested_by: str | None = None
+    requested_at: datetime | None = None
+    status: str
+    decided_by: str | None = None
+    decided_at: datetime | None = None
+    note: str | None = None
+    created_at: datetime
+
 class WriteModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -278,6 +291,10 @@ class CorrectionResult(BaseModel):
     fact: FactRead
     invalidated: list[dict[str, str]] = Field(default_factory=list)
     note: str = ""
+
+class ApprovalDecision(WriteModel):
+    decision: str
+    note: str | None = None
 
 class RunAccepted(BaseModel):
     """A manual run was queued (it executes on the worker, not in-request)."""

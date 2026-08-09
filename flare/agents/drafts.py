@@ -33,6 +33,18 @@ class HypothesisDraft(BaseModel):
     contradicts: list[uuid.UUID] = Field(default_factory=list)
     created_by: str = "HypothesisAgent"
 
+class MitigationDraft(BaseModel):
+    """A proposed mitigation, with the four things §11.6 requires it to state."""
+
+    ref: uuid.UUID = Field(default_factory=uuid.uuid4)
+    title: str
+    description: str
+    risk: str 
+    reversibility: str
+    expected_benefit: str
+    approval_required: bool = True
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    created_by: str = "MitigationAgent"
 
 class CriticVerdict(BaseModel):
     """The safety gate's decision"""

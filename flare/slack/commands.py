@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from flare.approvals import mitigation_view
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.llm import get_llm_client
@@ -29,7 +30,7 @@ _USAGE = (
     "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
     "`/flare investigate <what>`, `/flare validate <claim>`, "
     "`/flare correct \"what's wrong\"`, "
-    "`/flare mode <quiet|scribe|assist|active>`, or a read: "
+    "`/flare mode <quiet|scribe|assist|active>`, `/flare mitigation`, or a read: "
     "`/flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
 )
 
@@ -80,6 +81,10 @@ async def handle(
     if cmd.action == "correct":
         return await _handle_correct(
             cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
+    if cmd.action == "mitigation":
+        return await _handle_mitigation(
+            channel_id=channel_id, team_id=team_id, user_id=user_id
         )
     if cmd.action in _READ_COMMANDS:
         return await _handle_read(
@@ -239,6 +244,20 @@ async def _handle_correct(
     suffix = f" {count} claim(s) rejected." if count else ""
     return _ephemeral(f":pencil: Correction recorded.{suffix}")
 
+async def _handle_mitigation(
+    *, channel_id: str, team_id: str, user_id: str | None
+) -> dict[str, Any]:
+    """`/flare mitigation` — options with Approve/Reject."""
+    async with get_sessionmaker()() as session:
+        incident = await incident_for_channel(session, channel_id, team_id=team_id)
+        if incident is None:
+            return _ephemeral("No flare incident is tracking this channel.")
+        return await mitigation_view(
+            session,
+            incident,
+            actor=slack_actor(user_id or "unknown"),
+            dashboard_url=_dashboard_url(incident.id),
+        )
 
 async def _handle_read(
     action: str, args: list[str], *, channel_id: str, team_id: str

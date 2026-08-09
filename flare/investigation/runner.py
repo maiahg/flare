@@ -8,8 +8,14 @@ from typing import Any
 
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
-from flare.investigation.graph import GraphDeps, InvestigationPoster, build_initial_graph
+from flare.investigation.graph import (
+    ApprovalPoster,
+    GraphDeps,
+    InvestigationPoster,
+    build_initial_graph,
+)
 from flare.investigation.recorder import RunRecorder
+from flare.investigation.resume import capture_interrupt
 from flare.investigation.state import RunState
 from flare.llm import get_llm_client
 
@@ -23,6 +29,7 @@ async def start_initial_run(
     created_by: str = "system",
     scenario: str = "db_latency_spike",
     poster: InvestigationPoster | None = None,
+    approval_poster: ApprovalPoster | None = None,
     dashboard_url: str = "",
 ) -> uuid.UUID:
     """Run the initial investigation for an incident; return the run id.
@@ -59,6 +66,8 @@ async def start_initial_run(
         budget_started=time.monotonic(),
         dashboard_url=dashboard_url,
         poster=poster,
+        mitigation=settings.mitigation,
+        approval_poster=approval_poster,
     )
     graph = build_initial_graph(deps)
 
@@ -72,15 +81,17 @@ async def start_initial_run(
         "revision_count": 0,
     }
 
+    config = {"configurable": {"thread_id": str(run_id)}}
     try:
-        await graph.ainvoke(
-            initial_state, config={"configurable": {"thread_id": str(run_id)}}
-        )
+        result = await graph.ainvoke(initial_state, config=config)
     except Exception:
         _logger.exception("initial run %s failed", run_id)
         await recorder.finish(
             status="failed", limitations=["run crashed"], summary=None
         )
         raise
+
+    for _ in capture_interrupt(result, run_id, graph, config):
+        await recorder.add_limitation("mitigation branch awaiting human approval")
 
     return run_id
