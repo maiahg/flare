@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
+from typing import Literal
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from alembic.autogenerate.api import AutogenContext
 
 import src.models
 from src.config import get_settings
@@ -26,6 +29,15 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 config.set_main_option("sqlalchemy.url", str(get_settings().database_url))
+
+def render_item(
+    type_: str, obj: object, autogen_context: AutogenContext
+) -> str | Literal[False]:
+    """Render pgvector types with a proper import so migrations are runnable."""
+    if type_ == "type" and isinstance(obj, Vector):
+        autogen_context.imports.add("import pgvector.sqlalchemy")
+        return f"pgvector.sqlalchemy.Vector({obj.dim})"
+    return False
 
 
 def run_migrations_offline() -> None:
@@ -47,13 +59,14 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        render_item=render_item,
     )
 
     with context.begin_transaction():
         context.run_migrations()
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True, render_item=render_item,)
 
     with context.begin_transaction():
         context.run_migrations()
