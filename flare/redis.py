@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from redis.asyncio import Redis
 
-from src.config import get_settings
+from flare.config import get_settings
 
 _client: Redis | None = None
 

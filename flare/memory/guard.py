@@ -7,10 +7,10 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from src.memory.errors import UnmanagedWriteError
-from src.memory.repository import SANCTIONED_KEY
-from src.memory.spec import CLAIM_MODELS
-from src.models.audit import MemoryRevision
+from flare.memory.errors import UnmanagedWriteError
+from flare.memory.repository import SANCTIONED_KEY
+from flare.memory.spec import CLAIM_MODELS
+from flare.models.audit import MemoryRevision
 
 #: Claim tables plus the journal itself — nobody should forge revisions either.
 GUARDED_MODELS: tuple[type[Any], ...] = (*CLAIM_MODELS, MemoryRevision)

@@ -18,8 +18,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.db.base import Base, UUIDAuditMixin
-from src.models.provenance import DEFAULT_CLAIM_STATUS, ProvenanceMixin
+from flare.db.base import Base, UUIDAuditMixin
+from flare.models.provenance import DEFAULT_CLAIM_STATUS, ProvenanceMixin
 
 # ---- Enum-ish allowed values (app-layer validated) ------------------------
 EVIDENCE_SYSTEMS = (

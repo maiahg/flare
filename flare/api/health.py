@@ -5,12 +5,12 @@ import logging
 from fastapi import APIRouter, Response, status
 from sqlalchemy import text
 
-from src.db.session import get_engine
-from src.redis import get_redis
+from flare.db.session import get_engine
+from flare.redis import get_redis
 
 router = APIRouter(tags=["health"])
 
-_logger = logging.getLogger("src.health")
+_logger = logging.getLogger("flare.health")
 
 
 @router.get("/healthz")

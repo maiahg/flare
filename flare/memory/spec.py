@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.models.claims import (
+from flare.models.claims import (
     ACTION_ITEM_STATUSES,
     COMMS_STATUSES,
     HYPOTHESIS_STATUSES,
@@ -18,7 +18,7 @@ from src.models.claims import (
     OpenQuestion,
     TimelineEntry,
 )
-from src.models.provenance import CLAIM_STATUSES
+from flare.models.provenance import CLAIM_STATUSES
 
 CLAIM_MODELS: tuple[type[Any], ...] = (
     Evidence,

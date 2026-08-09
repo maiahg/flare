@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.db.base import Base, UUIDAuditMixin
+from flare.db.base import Base, UUIDAuditMixin
 
 RUN_TYPES = ("initial", "adaptive", "scheduled", "manual", "recovery")
 RUN_STATUSES = (

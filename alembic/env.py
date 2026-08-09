@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from alembic.autogenerate.api import AutogenContext
 
-import src.models
-from src.config import get_settings
-from src.db.base import Base
+import flare.models
+from flare.config import get_settings
+from flare.db.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

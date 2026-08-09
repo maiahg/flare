@@ -9,11 +9,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from src.logging import request_id_ctx
+from flare.logging import request_id_ctx
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
-_logger = logging.getLogger("src.request")
+_logger = logging.getLogger("flare.request")
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):

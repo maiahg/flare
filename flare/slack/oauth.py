@@ -6,8 +6,8 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import get_settings
-from src.models import Workspace
+from flare.config import get_settings
+from flare.models import Workspace
 
 SLACK_OAUTH_ACCESS_URL = "https://slack.com/api/oauth.v2.access"
 

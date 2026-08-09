@@ -6,15 +6,15 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.api import v1
-from src.api.health import router as health_router
-from src.api.middleware import RequestIdMiddleware
-from src.db.session import reset_engine
-from src.logging import configure_logging
-from src.redis import reset_redis
-from src.slack.router import router as slack_router
+from flare.api import v1
+from flare.api.health import router as health_router
+from flare.api.middleware import RequestIdMiddleware
+from flare.db.session import reset_engine
+from flare.logging import configure_logging
+from flare.redis import reset_redis
+from flare.slack.router import router as slack_router
 
-_logger = logging.getLogger("src.app")
+_logger = logging.getLogger("flare.app")
 
 
 @asynccontextmanager

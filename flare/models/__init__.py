@@ -1,5 +1,5 @@
-from src.models.audit import Approval, MemoryRevision
-from src.models.claims import (
+from flare.models.audit import Approval, MemoryRevision
+from flare.models.claims import (
     ActionItem,
     CommsDraft,
     Decision,
@@ -13,14 +13,14 @@ from src.models.claims import (
     Summary,
     TimelineEntry,
 )
-from src.models.core import (
+from flare.models.core import (
     Incident,
     IncidentSettings,
     User,
     Workspace,
 )
-from src.models.ingestion import Signal, SlackMessage, Trigger
-from src.models.tracing import AgentTrace, InvestigationRun, ToolCall
+from flare.models.ingestion import Signal, SlackMessage, Trigger
+from flare.models.tracing import AgentTrace, InvestigationRun, ToolCall
 
 __all__ = [
     # core

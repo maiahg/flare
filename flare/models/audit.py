@@ -8,7 +8,7 @@ from sqlalchemy import TIMESTAMP, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.db.base import Base, UUIDAuditMixin
+from flare.db.base import Base, UUIDAuditMixin
 
 MEMORY_REVISION_OPS = (
     "create",

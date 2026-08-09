@@ -7,17 +7,17 @@ from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from src.config import get_settings
-from src.db.session import get_sessionmaker
-from src.redis import get_redis
-from src.slack import oauth
-from src.slack.dedupe import mark_seen
-from src.slack.events import is_bot_message, normalize_event_callback
-from src.slack.signature import is_valid_signature
+from flare.config import get_settings
+from flare.db.session import get_sessionmaker
+from flare.redis import get_redis
+from flare.slack import oauth
+from flare.slack.dedupe import mark_seen
+from flare.slack.events import is_bot_message, normalize_event_callback
+from flare.slack.signature import is_valid_signature
 
 router = APIRouter(prefix="/slack", tags=["slack"])
 
-_logger = logging.getLogger("src.slack")
+_logger = logging.getLogger("flare.slack")
 
 
 async def _verified_body(request: Request) -> str:

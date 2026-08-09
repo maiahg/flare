@@ -1,4 +1,4 @@
-from src.memory.errors import (
+from flare.memory.errors import (
     EntityNotFoundError,
     ImmutableFieldError,
     InvalidStatusError,
@@ -7,9 +7,9 @@ from src.memory.errors import (
     UnknownFieldError,
     UnmanagedWriteError,
 )
-from src.memory.guard import install_write_guard, remove_write_guard
-from src.memory.repository import MemoryRepository
-from src.memory.spec import (
+from flare.memory.guard import install_write_guard, remove_write_guard
+from flare.memory.repository import MemoryRepository
+from flare.memory.spec import (
     CLAIM_MODELS,
     OP_CREATE,
     OP_REJECT,

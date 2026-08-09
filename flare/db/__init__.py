@@ -1,5 +1,5 @@
-from src.db.base import Base, TimestampMixin, UUIDAuditMixin, UUIDMixin
-from src.db.session import get_engine, get_session, get_sessionmaker, reset_engine
+from flare.db.base import Base, TimestampMixin, UUIDAuditMixin, UUIDMixin
+from flare.db.session import get_engine, get_session, get_sessionmaker, reset_engine
 
 __all__ = [
     "Base",

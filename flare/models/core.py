@@ -8,7 +8,7 @@ from sqlalchemy import TIMESTAMP, ForeignKey, Integer, String, Text, UniqueConst
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.db.base import Base, TimestampMixin, UUIDAuditMixin
+from flare.db.base import Base, TimestampMixin, UUIDAuditMixin
 
 INCIDENT_STATUSES = ("open", "mitigating", "monitoring", "resolved", "closed")
 INCIDENT_SEVERITIES = ("sev1", "sev2", "sev3", "sev4", "unknown")

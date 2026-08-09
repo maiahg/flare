@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.v1.schemas import (
+from flare.api.v1.schemas import (
     ActionItemRead,
     AgentTraceRead,
     CommsDraftRead,
@@ -30,9 +30,9 @@ from src.api.v1.schemas import (
     TimelineEntryRead,
     ToolCallRead,
 )
-from src.db.session import get_session
-from src.models.audit import MemoryRevision
-from src.models.claims import (
+from flare.db.session import get_session
+from flare.models.audit import MemoryRevision
+from flare.models.claims import (
     ActionItem,
     CommsDraft,
     Decision,
@@ -46,8 +46,8 @@ from src.models.claims import (
     Summary,
     TimelineEntry,
 )
-from src.models.core import Incident
-from src.models.tracing import AgentTrace, InvestigationRun, ToolCall
+from flare.models.core import Incident
+from flare.models.tracing import AgentTrace, InvestigationRun, ToolCall
 
 router = APIRouter(tags=["incidents"])
 

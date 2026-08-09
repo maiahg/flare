@@ -10,16 +10,18 @@ from typing import Any, TypeVar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.memory.errors import (
+from flare.events.bus import EVENT_MEMORY_UPDATED, Event
+from flare.events.outbox import enqueue
+from flare.memory.errors import (
     EntityNotFoundError,
     ImmutableFieldError,
     InvalidStatusError,
     ProvenanceError,
     UnknownFieldError,
 )
-from src.memory.snapshot import diff as compute_diff
-from src.memory.snapshot import snapshot
-from src.memory.spec import (
+from flare.memory.snapshot import diff as compute_diff
+from flare.memory.snapshot import snapshot
+from flare.memory.spec import (
     OP_CREATE,
     OP_REJECT,
     OP_RESOLVE,
@@ -34,12 +36,12 @@ from src.memory.spec import (
     immutable_fields,
     is_claim_model,
 )
-from src.models.audit import MemoryRevision
-from src.models.provenance import CLAIM_KINDS
+from flare.models.audit import MemoryRevision
+from flare.models.provenance import CLAIM_KINDS
 
 #: Marker placed on ``session.info`` while the repository is writing, so the
 #: optional write guard can tell sanctioned writes from stray ones.
-SANCTIONED_KEY = "src.memory.sanctioned"
+SANCTIONED_KEY = "flare.memory.sanctioned"
 
 C = TypeVar("C")
 
@@ -311,7 +313,7 @@ class MemoryRepository:
         run_id: uuid.UUID | None,
         reason: str | None,
     ) -> None:
-        """Append the revision row. Caller is already inside ``_sanctioned``."""
+        """Append the revision row and queue its realtime event."""
         self._session.add(
             MemoryRevision(
                 incident_id=incident_id,
@@ -322,9 +324,23 @@ class MemoryRepository:
                 after=after,
                 diff=compute_diff(before, after),
                 actor=actor,
-                run_id=run_id if run_id is not None else self._run_id,
+                run_id=effective_run_id,
                 reason=reason,
             )
+        )
+        enqueue(
+            self._session,
+            Event(
+                event=EVENT_MEMORY_UPDATED,
+                incident_id=incident_id,
+                data={
+                    "entity_type": entity_type(model),
+                    "entity_id": str(entity_id),
+                    "op": op,
+                    "actor": actor,
+                    "run_id": str(effective_run_id) if effective_run_id else None,
+                },
+            ),
         )
 
     def _validate_changes(self, model: type[Any], changes: Mapping[str, Any]) -> None:
