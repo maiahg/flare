@@ -1,0 +1,243 @@
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ORMModel(BaseModel):
+    """Base for schemas read directly off SQLAlchemy rows."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProvenanceEnvelope(ORMModel):
+    """The fields every claim carries."""
+
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    kind: str | None = None
+    confidence: float | None = None
+    source: dict[str, Any] | None = None
+    created_by: str | None = None
+    status: str | None = None
+    last_verified_at: datetime | None = None
+    superseded_by: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---- incidents -------------------------------------------------------------
+
+
+class IncidentSummaryCounts(BaseModel):
+    """Per-entity counts shown on the overview header."""
+
+    facts: int = 0
+    evidence: int = 0
+    hypotheses: int = 0
+    open_questions: int = 0
+    decisions: int = 0
+    action_items: int = 0
+    timeline_entries: int = 0
+    mitigation_options: int = 0
+
+
+class IncidentRead(ORMModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    slack_channel_id: str | None = None
+    title: str
+    description: str | None = None
+    status: str
+    severity: str | None = None
+    mode: str
+    started_at: datetime | None = None
+    detected_at: datetime | None = None
+    mitigated_at: datetime | None = None
+    resolved_at: datetime | None = None
+    closed_at: datetime | None = None
+    source: dict[str, Any] | None = None
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SummaryRead(ORMModel):
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    scope: str
+    body: str | None = None
+    version: int
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IncidentDetail(IncidentRead):
+    """Overview payload: the incident, its current summary, and counts."""
+
+    summary: SummaryRead | None = None
+    counts: IncidentSummaryCounts
+
+
+# ---- claims ----------------------------------------------------------------
+
+
+class FactRead(ProvenanceEnvelope):
+    statement: str | None = None
+
+
+class EvidenceRead(ProvenanceEnvelope):
+    title: str | None = None
+    body: str | None = None
+    observed_at: datetime | None = None
+    system: str | None = None
+    query: str | None = None
+    result_ref: dict[str, Any] | None = None
+    tool_call_id: uuid.UUID | None = None
+    staleness_at: datetime | None = None
+
+
+class HypothesisRead(ProvenanceEnvelope):
+    statement: str | None = None
+    rank: int | None = None
+    likelihood: float | None = None
+    supporting_evidence: list[EvidenceRead] = Field(default_factory=list)
+    contradicting_evidence: list[EvidenceRead] = Field(default_factory=list)
+
+
+class OpenQuestionRead(ProvenanceEnvelope):
+    question: str | None = None
+    owner_user_id: uuid.UUID | None = None
+    answer: str | None = None
+
+
+class DecisionRead(ProvenanceEnvelope):
+    statement: str | None = None
+    decided_by: str | None = None
+    decided_at: datetime | None = None
+    rationale: str | None = None
+
+
+class ActionItemRead(ProvenanceEnvelope):
+    description: str | None = None
+    owner_user_id: uuid.UUID | None = None
+    due_at: datetime | None = None
+
+
+class TimelineEntryRead(ProvenanceEnvelope):
+    occurred_at: datetime | None = None
+    entry_type: str | None = None
+    description: str | None = None
+
+
+class MitigationOptionRead(ProvenanceEnvelope):
+    title: str | None = None
+    description: str | None = None
+    risk: str | None = None
+    reversibility: str | None = None
+    expected_benefit: str | None = None
+    approval_required: bool | None = None
+
+
+class CommsDraftRead(ProvenanceEnvelope):
+    audience: str | None = None
+    body: str | None = None
+    version: int | None = None
+
+
+class PostmortemDraftRead(ORMModel):
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    sections: dict[str, Any] | None = None
+    follow_ups: dict[str, Any] | list[Any] | None = None
+    version: int
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---- runs ------------------------------------------------------------------
+
+
+class ToolCallRead(ORMModel):
+    id: uuid.UUID
+    run_id: uuid.UUID | None = None
+    agent_trace_id: uuid.UUID | None = None
+    tool_name: str
+    system: str | None = None
+    args: dict[str, Any] | None = None
+    args_hash: str | None = None
+    read_only: bool | None = None
+    status: str | None = None
+    latency_ms: int | None = None
+    result_ref: dict[str, Any] | None = None
+    redactions: dict[str, Any] | list[Any] | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+    created_at: datetime
+
+
+class AgentTraceRead(ORMModel):
+    id: uuid.UUID
+    run_id: uuid.UUID
+    agent_name: str
+    seq: int | None = None
+    status: str | None = None
+    input: dict[str, Any] | None = None
+    output: dict[str, Any] | None = None
+    reasoning_summary: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    tokens: dict[str, Any] | None = None
+    model_name: str | None = None
+    provider_request_id: str | None = None
+    error: str | None = None
+    created_at: datetime
+    tool_calls: list[ToolCallRead] = Field(default_factory=list)
+
+
+class RunRead(ORMModel):
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    run_type: str
+    trigger: dict[str, Any] | None = None
+    plan: dict[str, Any] | None = None
+    status: str
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    token_in: int | None = None
+    token_out: int | None = None
+    provider_request_id: str | None = None
+    limitations: list[str] | None = None
+    summary: str | None = None
+    created_by: str | None = None
+    created_at: datetime
+
+
+class RunDetail(RunRead):
+    """A run plus its agent traces and the tool calls beneath them."""
+
+    agent_traces: list[AgentTraceRead] = Field(default_factory=list)
+
+
+# ---- audit -----------------------------------------------------------------
+
+
+class RevisionRead(ORMModel):
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    entity_type: str
+    entity_id: uuid.UUID
+    op: str
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    diff: dict[str, Any] | None = None
+    actor: str | None = None
+    run_id: uuid.UUID | None = None
+    reason: str | None = None
+    created_at: datetime
