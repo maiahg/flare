@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from flare.models.core import Incident, Workspace
+from flare.models.core import Incident, User, Workspace
 
 
 async def get_workspace_by_team(
@@ -24,6 +24,38 @@ def bot_user_id(workspace: Workspace) -> str | None:
     return str(value) if value else None
 
 
+async def incident_for_channel(
+    session: AsyncSession, channel_id: str, *, team_id: str | None = None
+) -> Incident | None:
+    """The incident tracking a channel, scoped to its workspace when known."""
+    if not channel_id:
+        return None
+    stmt = select(Incident).where(Incident.slack_channel_id == channel_id)
+    if team_id:
+        stmt = stmt.join(Workspace, Incident.workspace_id == Workspace.id).where(
+            Workspace.slack_team_id == team_id
+        )
+    return await session.scalar(stmt.limit(1))
+
+
+async def resolve_user(
+    session: AsyncSession, workspace_id: uuid.UUID, slack_user_id: str
+) -> User:
+    """Find (or record) the workspace member behind a Slack user id."""
+    user = await session.scalar(
+        select(User).where(
+            User.workspace_id == workspace_id,
+            User.slack_user_id == slack_user_id,
+        )
+    )
+    if user is not None:
+        return user
+    user = User(workspace_id=workspace_id, slack_user_id=slack_user_id)
+    session.add(user)
+    await session.flush()
+    return user
+
+
 async def adopt_or_create_incident(
     session: AsyncSession,
     *,
@@ -34,11 +66,7 @@ async def adopt_or_create_incident(
     description: str | None = None,
     created_by: str | None = None,
 ) -> Incident:
-    """Return the incident tracking ``channel_id``, creating one if needed.
-
-    An existing incident is flipped into ``assist`` mode (the mode that posts
-    findings); a new one starts in ``assist`` with ``status=open``.
-    """
+    """Return the incident tracking ``channel_id``, creating one if needed."""
     incident = await session.scalar(
         select(Incident).where(
             Incident.workspace_id == workspace_id,

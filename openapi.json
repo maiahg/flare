@@ -92,9 +92,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Slack Commands Route Slack Commands Post"
                 }
@@ -110,7 +108,7 @@
           "slack"
         ],
         "summary": "Slack Interactions",
-        "description": "Interactivity endpoint (buttons/modals/menus). ACKs; no work yet.",
+        "description": "Interactivity endpoint: buttons and menus steer the incident (\u00a75).\n\nThe work happens inline \u2014 these are single-row steering writes, well inside\nSlack's 3s budget \u2014 and the confirmation goes back through ``response_url``.",
         "operationId": "slack_interactions_slack_interactions_post",
         "responses": {
           "200": {
@@ -118,9 +116,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "boolean"
-                  },
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Slack Interactions Slack Interactions Post"
                 }

@@ -7,11 +7,9 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Request, status
-from sqlalchemy import select
 
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
-from flare.models.core import Incident, Workspace
 from flare.redis import get_redis
 from flare.slack import oauth, commands as slack_commands
 from flare.slack.dedupe import mark_seen
@@ -20,7 +18,9 @@ from flare.slack.incident_ops import (
     adopt_or_create_incident,
     bot_user_id,
     get_workspace_by_team,
+    incident_for_channel,
 )
+from flare.slack.interactions import handle_interaction
 from flare.slack.signature import is_valid_signature
 from flare.worker.enqueue import enqueue_initial_run, enqueue_message
 
@@ -47,21 +47,12 @@ async def _verified_body(request: Request) -> str:
     return body
 
 async def _incident_for_channel(team_id: str, channel: str | None) -> uuid.UUID | None:
-    """Look up a tracked incident by its Slack channel, scoped to the workspace."""
+    """The id of the incident tracking this channel, or None."""
     if not channel:
         return None
-    stmt = (
-        select(Incident.id)
-        .join(Workspace, Incident.workspace_id == Workspace.id)
-        .where(
-            Workspace.slack_team_id == team_id,
-            Incident.slack_channel_id == channel,
-        )
-        .limit(1)
-    )
     async with get_sessionmaker()() as session:
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        incident = await incident_for_channel(session, channel, team_id=team_id)
+        return incident.id if incident is not None else None
 
 @router.post("/events")
 async def slack_events(request: Request) -> dict[str, Any]:
@@ -120,7 +111,7 @@ async def slack_events(request: Request) -> dict[str, Any]:
 
 
 async def _maybe_fire_join_run(internal: InternalEvent) -> None:
-    """When the bot joins a channel, create/adopt an incident + fire a run."""
+    """When the *bot* joins a channel, create/adopt an incident + fire a run."""
     if not internal.channel or not internal.user:
         return
     async with get_sessionmaker()() as session:
@@ -145,7 +136,7 @@ async def _maybe_fire_join_run(internal: InternalEvent) -> None:
 
 
 @router.post("/commands")
-async def slack_commands_route(request: Request) -> dict[str, str]:
+async def slack_commands_route(request: Request) -> dict[str, Any]:
     body = await _verified_body(request)
     form = parse_qs(body)
     command = form.get("command", [""])[0]
@@ -162,8 +153,8 @@ async def slack_commands_route(request: Request) -> dict[str, str]:
 
 
 @router.post("/interactions")
-async def slack_interactions(request: Request) -> dict[str, bool]:
-    """Interactivity endpoint (buttons/modals/menus). ACKs; no work yet."""
+async def slack_interactions(request: Request) -> dict[str, Any]:
+    """Interactivity endpoint: buttons and menus steer the incident"""
     body = await _verified_body(request)
     form = parse_qs(body)
     raw_payload = form.get("payload", ["{}"])[0]
@@ -175,7 +166,7 @@ async def slack_interactions(request: Request) -> dict[str, bool]:
         "slack interaction received",
         extra={"interaction_type": interaction.get("type")},
     )
-    return {"ok": True}
+    return await handle_interaction(interaction)
 
 
 @router.get("/oauth/callback")
