@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from flare.agents.guards import deterministic_signals
-from flare.agents.schemas import ExtractedSignal, ScribeOutput
+from flare.agents.schemas import ScribeOutput
 from flare.llm import LLMClient, redact
 from flare.models.ingestion import SIGNAL_TYPES, Signal, SlackMessage
 

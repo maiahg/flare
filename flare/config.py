@@ -24,20 +24,6 @@ class LLMProviderSettings(BaseModel):
     request_id_header: str | None = OPENROUTER_REQUEST_ID_HEADER
     headers: dict[str, str] = {}
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_nested_delimiter="__", case_sensitive=False, extra="ignore")
-
-    database_url: PostgresDsn
-    redis_url: RedisDsn
-    app_base_url: HttpUrl
-
-    slack: SlackSettings
-    llm: LLMSettings = LLMSettings()
-
-@lru_cache(maxsize=1)
-def get_settings() -> Settings:
-    return Settings()
-
 class LLMModelSettings(BaseModel):
     scribe: str = DEFAULT_FAST_MODEL
     trigger: str = DEFAULT_FAST_MODEL
@@ -55,3 +41,17 @@ class LLMSettings(BaseModel):
     langfuse: LangfuseSettings = LangfuseSettings()
     max_repair_attempts: int = 1
     rate_limit: LLMRateLimitSettings = LLMRateLimitSettings()
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_nested_delimiter="__", case_sensitive=False, extra="ignore")
+
+    database_url: PostgresDsn
+    redis_url: RedisDsn
+    app_base_url: HttpUrl
+
+    slack: SlackSettings
+    llm: LLMSettings = LLMSettings()
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()

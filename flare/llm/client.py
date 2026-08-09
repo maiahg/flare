@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from openai import AsyncOpenAI, APIStatusError, RateLimitError
+from openai.types.chat import ChatCompletionMessageParam
+from openai.types.shared_params import ResponseFormatJSONSchema
 from pydantic import BaseModel, ValidationError
 
 from flare.config import get_settings
@@ -53,12 +55,15 @@ class OpenAICompatibleClient:
     ) -> LLMResult[T]:
         model_id = model or self._default_model
         user = redact(user)
-        json_schema = {
-            "name": schema.__name__,
-            "schema": schema.model_json_schema(),
-            "strict": True,
+        response_format: ResponseFormatJSONSchema = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema.__name__,
+                "schema": schema.model_json_schema(),
+                "strict": False,
+            },
         }
-        messages = [
+        messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
@@ -70,7 +75,7 @@ class OpenAICompatibleClient:
                     model=model_id,
                     messages=messages,
                     temperature=temperature,
-                    response_format={"type": "json_schema", "json_schema": json_schema},
+                    response_format=response_format,
                     extra_headers={"Cache-Control": "no-store"},
                 )
             except RateLimitError as exc:

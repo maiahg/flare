@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Any
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlalchemy import select
 
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
+from flare.models.core import Incident, Workspace
 from flare.redis import get_redis
-from flare.slack import oauth
+from flare.slack import oauth, commands as slack_commands
 from flare.slack.dedupe import mark_seen
 from flare.slack.events import is_bot_message, normalize_event_callback
 from flare.slack.signature import is_valid_signature
+from flare.worker.enqueue import enqueue_message
 
 router = APIRouter(prefix="/slack", tags=["slack"])
 
@@ -37,6 +41,22 @@ async def _verified_body(request: Request) -> str:
         )
     return body
 
+async def _incident_for_channel(team_id: str, channel: str | None) -> uuid.UUID | None:
+    """Look up a tracked incident by its Slack channel, scoped to the workspace."""
+    if not channel:
+        return None
+    stmt = (
+        select(Incident.id)
+        .join(Workspace, Incident.workspace_id == Workspace.id)
+        .where(
+            Workspace.slack_team_id == team_id,
+            Incident.slack_channel_id == channel,
+        )
+        .limit(1)
+    )
+    async with get_sessionmaker()() as session:
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
 @router.post("/events")
 async def slack_events(request: Request) -> dict[str, Any]:
@@ -73,7 +93,19 @@ async def slack_events(request: Request) -> dict[str, Any]:
                 "channel": internal.channel,
             },
         )
-        # No processing yet — a later PR enqueues to the orchestrator here.
+        if internal.event_type == 'message' and internal.text:
+            incident_id = await _incident_for_channel(internal.team_id, internal.channel)
+            if incident_id is not None:
+                await enqueue_message(
+                    {
+                        "incident_id": str(incident_id),
+                        "slack_ts": internal.ts,
+                        "user_id": internal.user,
+                        "text": internal.text,
+                        "channel": internal.channel,
+                        "team_id": internal.team_id,
+                    }
+                )
         return {"ok": True, "status": "accepted"}
 
     # Unknown top-level type — ACK so Slack doesn't retry.
@@ -81,20 +113,16 @@ async def slack_events(request: Request) -> dict[str, Any]:
 
 
 @router.post("/commands")
-async def slack_commands(request: Request) -> dict[str, str]:
-    """Slash command endpoint (``/flare``). ACKs ephemerally; no work yet."""
+async def slack_commands_route(request: Request) -> dict[str, str]:
     body = await _verified_body(request)
     form = parse_qs(body)
     command = form.get("command", [""])[0]
     text = form.get("text", [""])[0]
-    _logger.info(
-        "slack command received",
-        extra={"command": command, "text": text},
-    )
-    return {
-        "response_type": "ephemeral",
-        "text": f"Received `{command}` — flare is warming up.",
-    }
+    channel_id = form.get("channel_id", [""])[0]
+    _logger.info("slack command received", extra={"command": command, "text": text})
+    if command == "/flare":
+        return await slack_commands.handle(text, channel_id=channel_id)
+    return {"response_type": "ephemeral", "text": f"Unknown command `{command}`."}
 
 
 @router.post("/interactions")

@@ -25,3 +25,6 @@ fmt:
 
 typecheck:
 	$(UV) mypy .
+
+worker:
+	$(UV) arq flare.worker.settings.WorkerSettings
