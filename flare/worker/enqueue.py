@@ -21,3 +21,9 @@ async def enqueue_message(payload: dict[str, Any]) -> None:
     """Enqueue a normalized Slack message for the scribe pipeline."""
     pool = await get_arq_pool()
     await pool.enqueue_job("process_message", payload)
+
+
+async def enqueue_initial_run(payload: dict[str, Any]) -> None:
+    """Enqueue an initial investigation run (off the Slack request path)."""
+    pool = await get_arq_pool()
+    await pool.enqueue_job("run_initial_investigation", payload)

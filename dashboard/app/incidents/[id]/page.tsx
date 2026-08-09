@@ -1,13 +1,30 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 
+import { EvidenceList, HypothesisList } from "@/components/ClaimLists";
 import { IncidentOverview } from "@/components/IncidentOverview";
+import { RunDetailView, RunList } from "@/components/RunTrace";
 import { Timeline } from "@/components/Timeline";
-import { useIncident, useTimeline } from "@/lib/hooks";
+import {
+  useEvidence,
+  useHypotheses,
+  useIncident,
+  useRun,
+  useRuns,
+  useTimeline,
+} from "@/lib/hooks";
 import { useIncidentStream } from "@/lib/useIncidentStream";
 
-type Tab = "overview" | "timeline";
+type Tab = "overview" | "timeline" | "runs" | "evidence" | "hypotheses";
+
+const TABS: Array<[Tab, string]> = [
+  ["overview", "Overview"],
+  ["timeline", "Timeline"],
+  ["runs", "Runs"],
+  ["evidence", "Evidence"],
+  ["hypotheses", "Hypotheses"],
+];
 
 export default function IncidentPage({
   params,
@@ -16,21 +33,37 @@ export default function IncidentPage({
 }) {
   const { id } = use(params);
   const [tab, setTab] = useState<Tab>("overview");
+  const [selectedRun, setSelectedRun] = useState<string | null>(null);
 
+  // Live: invalidate this incident's queries whenever memory changes.
   useIncidentStream(id);
 
   const incident = useIncident(id);
   const timeline = useTimeline(id);
+  const runs = useRuns(id);
+  const run = useRun(id, selectedRun);
+  const evidence = useEvidence(id);
+  const hypotheses = useHypotheses(id);
+
+  // Default to the most recent run once the list loads.
+  useEffect(() => {
+    if (!selectedRun && runs.data && runs.data.length > 0) {
+      setSelectedRun(runs.data[0].id);
+    }
+  }, [runs.data, selectedRun]);
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
+    <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
       <nav style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
-        <button onClick={() => setTab("overview")} disabled={tab === "overview"}>
-          Overview
-        </button>
-        <button onClick={() => setTab("timeline")} disabled={tab === "timeline"}>
-          Timeline
-        </button>
+        {TABS.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            disabled={tab === key}
+          >
+            {label}
+          </button>
+        ))}
       </nav>
 
       {incident.isLoading ? <p>Loading…</p> : null}
@@ -42,6 +75,28 @@ export default function IncidentPage({
 
       {tab === "timeline" ? (
         <Timeline entries={timeline.data ?? []} />
+      ) : null}
+
+      {tab === "runs" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "1.5rem" }}>
+          <RunList
+            runs={runs.data ?? []}
+            selectedId={selectedRun}
+            onSelect={setSelectedRun}
+          />
+          <div>
+            {run.isLoading ? <p>Loading run…</p> : null}
+            {run.data ? <RunDetailView run={run.data} /> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "evidence" ? (
+        <EvidenceList evidence={evidence.data ?? []} />
+      ) : null}
+
+      {tab === "hypotheses" ? (
+        <HypothesisList hypotheses={hypotheses.data ?? []} />
       ) : null}
     </main>
   );

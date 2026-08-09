@@ -7,7 +7,10 @@ from sqlalchemy import select
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.models.claims import TimelineEntry
-from flare.models.core import INCIDENT_MODES, Incident
+from flare.models.core import INCIDENT_MODES, INCIDENT_SEVERITIES, Incident
+from flare.slack.incident_ops import adopt_or_create_incident, get_workspace_by_team
+from flare.slack.posting import SlackPoster, post_incident_card
+from flare.worker.enqueue import enqueue_initial_run
 
 _TIMELINE_N = 10
 
@@ -29,15 +32,97 @@ def _ephemeral(text: str) -> dict[str, str]:
     return {"response_type": "ephemeral", "text": text}
 
 
-async def handle(command_text: str, *, channel_id: str) -> dict[str, str]:
+async def handle(
+    command_text: str,
+    *,
+    channel_id: str,
+    team_id: str = "",
+    user_id: str | None = None,
+) -> dict[str, str]:
     cmd = parse(command_text)
+    if cmd.action == "start":
+        return await _handle_start(
+            cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
     if cmd.action == "mode":
         return await _handle_mode(cmd.args, channel_id=channel_id)
     if cmd.action == "timeline":
         return await _handle_timeline(channel_id=channel_id)
     return _ephemeral(
-        "Usage: `/flare mode <quiet|scribe|assist|active>` or `/flare timeline`"
+        "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
+        "`/flare mode <quiet|scribe|assist|active>`, or `/flare timeline`"
     )
+
+
+@dataclass(frozen=True)
+class _StartArgs:
+    title: str
+    severity: str
+    description: str | None
+
+
+def _parse_start(args: list[str]) -> _StartArgs:
+    """Parse `"title" [--sev sevN] [--desc ...]` from whitespace-split tokens."""
+    title_parts: list[str] = []
+    severity = "unknown"
+    description: str | None = None
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--sev" and i + 1 < len(args):
+            candidate = args[i + 1].lower()
+            severity = candidate if candidate in INCIDENT_SEVERITIES else "unknown"
+            i += 2
+        elif token == "--desc":
+            description = " ".join(args[i + 1 :]).strip() or None
+            break
+        else:
+            title_parts.append(token)
+            i += 1
+    title = " ".join(title_parts).strip().strip('"').strip("'")
+    return _StartArgs(title=title or "Untitled incident", severity=severity, description=description)
+
+
+async def _handle_start(
+    args: list[str], *, channel_id: str, team_id: str, user_id: str | None
+) -> dict[str, str]:
+    parsed = _parse_start(args)
+    async with get_sessionmaker()() as session:
+        workspace = await get_workspace_by_team(session, team_id)
+        if workspace is None:
+            return _ephemeral("Flare isn't installed in this workspace.")
+        incident = await adopt_or_create_incident(
+            session,
+            workspace_id=workspace.id,
+            channel_id=channel_id,
+            title=parsed.title,
+            severity=parsed.severity,
+            description=parsed.description,
+            created_by=user_id,
+        )
+        incident_id = incident.id
+
+    thread_ts: str | None = None
+    try:
+        thread_ts = await post_incident_card(
+            SlackPoster(), channel=channel_id, title=parsed.title, severity=parsed.severity
+        )
+    except Exception:
+        thread_ts = None
+
+    await enqueue_initial_run(
+        {
+            "incident_id": str(incident_id),
+            "trigger": {
+                "reason": "flare_start",
+                "command": "/flare start",
+                "user_id": user_id,
+            },
+            "created_by": user_id or "system",
+            "thread_ts": thread_ts,
+        }
+    )
+    return _ephemeral(f"Started investigation for *{parsed.title}*. Investigating…")
 
 
 async def _handle_mode(args: list[str], *, channel_id: str) -> dict[str, str]:

@@ -15,9 +15,14 @@ from flare.models.core import Incident, Workspace
 from flare.redis import get_redis
 from flare.slack import oauth, commands as slack_commands
 from flare.slack.dedupe import mark_seen
-from flare.slack.events import is_bot_message, normalize_event_callback
+from flare.slack.events import InternalEvent, is_bot_message, normalize_event_callback
+from flare.slack.incident_ops import (
+    adopt_or_create_incident,
+    bot_user_id,
+    get_workspace_by_team,
+)
 from flare.slack.signature import is_valid_signature
-from flare.worker.enqueue import enqueue_message
+from flare.worker.enqueue import enqueue_initial_run, enqueue_message
 
 router = APIRouter(prefix="/slack", tags=["slack"])
 
@@ -106,10 +111,37 @@ async def slack_events(request: Request) -> dict[str, Any]:
                         "team_id": internal.team_id,
                     }
                 )
+        elif internal.event_type == "member_joined_channel":
+            await _maybe_fire_join_run(internal)
         return {"ok": True, "status": "accepted"}
 
     # Unknown top-level type — ACK so Slack doesn't retry.
     return {"ok": True, "status": "ignored"}
+
+
+async def _maybe_fire_join_run(internal: InternalEvent) -> None:
+    """When the bot joins a channel, create/adopt an incident + fire a run."""
+    if not internal.channel or not internal.user:
+        return
+    async with get_sessionmaker()() as session:
+        workspace = await get_workspace_by_team(session, internal.team_id)
+        if workspace is None or internal.user != bot_user_id(workspace):
+            return
+        incident = await adopt_or_create_incident(
+            session,
+            workspace_id=workspace.id,
+            channel_id=internal.channel,
+            title=f"Incident in {internal.channel}",
+            created_by="system",
+        )
+        incident_id = incident.id
+    await enqueue_initial_run(
+        {
+            "incident_id": str(incident_id),
+            "trigger": {"reason": "member_joined_channel"},
+            "created_by": "system",
+        }
+    )
 
 
 @router.post("/commands")
@@ -119,9 +151,13 @@ async def slack_commands_route(request: Request) -> dict[str, str]:
     command = form.get("command", [""])[0]
     text = form.get("text", [""])[0]
     channel_id = form.get("channel_id", [""])[0]
+    team_id = form.get("team_id", [""])[0]
+    user_id = form.get("user_id", [""])[0] or None
     _logger.info("slack command received", extra={"command": command, "text": text})
     if command == "/flare":
-        return await slack_commands.handle(text, channel_id=channel_id)
+        return await slack_commands.handle(
+            text, channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
     return {"response_type": "ephemeral", "text": f"Unknown command `{command}`."}
 
 

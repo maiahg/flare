@@ -1,8 +1,113 @@
 from __future__ import annotations
 
+import logging
+import uuid
+from typing import Any
+
+import httpx
+
+from flare.events.bus import EVENT_SLACK_POSTED, Event, publish
+from flare.secrets import slack_bot_token
+
 _PROACTIVE_MODES = frozenset({"assist", "active"})
+_SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
+
+_logger = logging.getLogger("flare.slack.posting")
 
 
 def can_post_proactively(mode: str) -> bool:
     """True only in modes where the bot may post without being asked."""
     return mode in _PROACTIVE_MODES
+
+
+class SlackPoster:
+    """Minimal `chat.postMessage` client using the bot token."""
+
+    def __init__(self, token: str | None = None) -> None:
+        self._token = token if token is not None else slack_bot_token()
+
+    async def post_message(
+        self,
+        channel: str,
+        text: str,
+        *,
+        thread_ts: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"channel": channel, "text": text}
+        if thread_ts is not None:
+            payload["thread_ts"] = thread_ts
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                _SLACK_POST_URL,
+                headers={"Authorization": f"Bearer {self._token}"},
+                json=payload,
+            )
+        data: dict[str, Any] = resp.json()
+        if not data.get("ok"):
+            _logger.warning("slack post failed: %s", data.get("error"))
+        return data
+
+
+async def post_incident_card(
+    poster: SlackPoster, *, channel: str, title: str, severity: str
+) -> str | None:
+    """Post the pinned incident card + 'investigating…'. Returns its ts."""
+    text = f":rotating_light: *{title}* ({severity})\nFlare is investigating…"
+    result = await poster.post_message(channel, text)
+    return result.get("ts")
+
+
+class InvestigationSlackPoster:
+    """Adapts `SlackPoster` to the graph's `InvestigationPoster` protocol."""
+
+    def __init__(
+        self,
+        poster: SlackPoster,
+        *,
+        channel: str,
+        incident_id: uuid.UUID,
+        mode: str,
+        thread_ts: str | None = None,
+    ) -> None:
+        self._poster = poster
+        self._channel = channel
+        self._incident_id = incident_id
+        self._mode = mode
+        self._thread_ts = thread_ts
+
+    async def post_intent(self, checking: list[str]) -> None:
+        if not can_post_proactively(self._mode):
+            return
+        text = f":mag: Checking {', '.join(checking)}…"
+        await self._poster.post_message(
+            self._channel, text, thread_ts=self._thread_ts
+        )
+        await self._announce("intent")
+
+    async def post_findings(
+        self, *, summary: str | None, top_hypothesis: str | None, dashboard_url: str
+    ) -> None:
+        if not can_post_proactively(self._mode):
+            return
+        lines = [":clipboard: *Findings*"]
+        if summary:
+            lines.append(summary)
+        if top_hypothesis:
+            lines.append(f"*Leading hypothesis:* {top_hypothesis}")
+        lines.append(f"<{dashboard_url}|Full investigation →>")
+        await self._poster.post_message(
+            self._channel, "\n".join(lines), thread_ts=self._thread_ts
+        )
+        await self._announce("findings")
+
+    async def _announce(self, kind: str) -> None:
+        try:
+            await publish(
+                Event(
+                    event=EVENT_SLACK_POSTED,
+                    incident_id=self._incident_id,
+                    data={"kind": kind},
+                )
+            )
+        except Exception:  # noqa: BLE001 - SSE hint, never fail the post
+            _logger.debug("failed to publish slack.posted", exc_info=True)

@@ -10,6 +10,7 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_REQUEST_ID_HEADER = "X-Request-Id"
 
 DEFAULT_FAST_MODEL = "openai/gpt-oss-20b:free"
+DEFAULT_REASONING_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 class SlackSettings(BaseModel):
     signing_secret: SecretStr
