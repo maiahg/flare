@@ -12,6 +12,7 @@ from src.api.middleware import RequestIdMiddleware
 from src.db.session import reset_engine
 from src.logging import configure_logging
 from src.redis import reset_redis
+from src.slack.router import router as slack_router
 
 _logger = logging.getLogger("src.app")
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
 
     app.include_router(health_router)
+    app.include_router(slack_router)
     app.include_router(v1.router)
 
     return app

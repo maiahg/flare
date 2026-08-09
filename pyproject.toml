@@ -17,8 +17,10 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pyyaml>=6.0.3",
     "redis>=8.1.0",
     "ruff>=0.16.2",
     "sqlalchemy>=2.0.51",
+    "types-pyyaml>=6.0.12.20260724",
     "uvicorn>=0.52.1",
 ]
