@@ -27,6 +27,8 @@ class AdapterCase:
     bad_args: dict[str, Any] = field(
         default_factory=lambda: {"definitely_not_a_real_argument": 1}
     )
+    standing_limitations: bool = False
+    always_degraded: bool = False
 
 
 @dataclass
@@ -96,11 +98,26 @@ async def run_contract(case: AdapterCase) -> ContractReport:
             "result carries an `as of` timestamp",
             result.fetched_at is not None,
         )
-        record(
-            "healthy read is not degraded",
-            not result.degraded,
-            str(result.limitations),
-        )
+        if case.always_degraded:
+            record(
+                "backendless capability reports a permanent gap",
+                result.degraded and not any(result.data.values()),
+                str(result.limitations),
+            )
+        elif case.standing_limitations:
+            record(
+                "healthy read still returns findings despite its caveat",
+                any(
+                    isinstance(v, list | dict) and v for v in result.data.values()
+                ),
+                f"caveat: {result.limitations}",
+            )
+        else:
+            record(
+                "healthy read is not degraded",
+                not result.degraded,
+                str(result.limitations),
+            )
 
     # --- idempotence -------------------------------------------------------
     # A read must be safe to repeat: the broker caches, retries, and replays.

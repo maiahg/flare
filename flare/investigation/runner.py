@@ -14,7 +14,7 @@ from flare.investigation.graph import (
     InvestigationPoster,
     build_initial_graph,
 )
-from flare.investigation.recorder import RunRecorder
+from flare.investigation.recorder import BrokerFactory, RunRecorder
 from flare.investigation.resume import capture_interrupt
 from flare.investigation.state import RunState
 from flare.llm import get_llm_client
@@ -31,13 +31,9 @@ async def start_initial_run(
     poster: InvestigationPoster | None = None,
     approval_poster: ApprovalPoster | None = None,
     dashboard_url: str = "",
+    broker_factory: BrokerFactory | None = None,
 ) -> uuid.UUID:
-    """Run the initial investigation for an incident; return the run id.
-
-    The run row is created up front (status=running) so tool-call FKs resolve;
-    the graph's ``persist_run`` node flips it to ``done``. Any unexpected error
-    marks the run ``failed`` and re-raises.
-    """
+    """Run the initial investigation for an incident; return the run id."""
     settings = get_settings()
     sessionmaker = get_sessionmaker()
     trigger = trigger or {}
@@ -49,6 +45,7 @@ async def start_initial_run(
         trigger=trigger,
         created_by=created_by,
         scenario=scenario,
+        broker_factory=broker_factory,
     )
     run_id = await recorder.start()
 

@@ -14,7 +14,11 @@ _SYSTEM = f"""You are an incident investigation read-agent.
 {UNTRUSTED_DATA_RULE}
 Summarize only what the data shows into short, factual findings with a
 calibrated confidence (0-1). Do not speculate about root cause — that is another
-agent's job. Return findings matching the schema."""
+agent's job.
+
+Some reads may be marked UNAVAILABLE. Never infer that something is healthy,
+absent, or normal from a read that failed — say what you saw, and nothing about
+what you could not see. Return findings matching the schema."""
 
 
 @dataclass(frozen=True)
@@ -38,6 +42,7 @@ class ReadAgent:
         self._broker = broker
         self._model = model
         self.usage = LLMUsage()
+        self.limitations: list[str] = []
 
     async def gather(self, plan: dict[str, Any]) -> list[Probe]:
         """Make the broker calls this agent needs. Override in subclasses."""
@@ -47,14 +52,25 @@ class ReadAgent:
         self, *, plan: dict[str, Any], memory_snapshot: dict[str, Any] | None = None
     ) -> list[EvidenceDraft]:
         probes = await self.gather(plan)
-        probes = [p for p in probes if p.brokered.result.data]
-        if not probes:
+        self.limitations = [
+            f"{p.brokered.result.system}: {limit} (query: {p.query})"
+            for p in probes
+            for limit in p.brokered.result.limitations
+        ]
+        usable = [p for p in probes if p.brokered.result.data]
+        if not usable:
             return []
 
-        primary = probes[0]
+        primary = usable[0]
         payload = "\n".join(
-            f"query: {p.query}\nresult: {json.dumps(p.brokered.result.data, default=str)}"
-            for p in probes
+            f"query: {p.query}\n"
+            + (
+                "UNAVAILABLE: " + "; ".join(p.brokered.result.limitations) + "\n"
+                if p.brokered.result.limitations
+                else ""
+            )
+            + f"result: {json.dumps(p.brokered.result.data, default=str)}"
+            for p in usable
         )
         result = await self._llm.structured(
             schema=ReadAgentOutput,
@@ -81,7 +97,7 @@ class ReadAgent:
             )
 
         if not drafts:
-            for p in probes:
+            for p in usable:
                 drafts.append(
                     EvidenceDraft(
                         system=self.system,

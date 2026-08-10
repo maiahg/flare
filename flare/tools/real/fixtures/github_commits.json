@@ -1,0 +1,263 @@
+[
+  {
+    "sha": "5542b00b9d5933e29d7b597705c718b764bcc1cb",
+    "node_id": "C_kwDOAGhaidoAKDU1NDJiMDBiOWQ1OTMzZTI5ZDdiNTk3NzA1YzcxOGI3NjRiY2MxY2I",
+    "commit": {
+      "author": {
+        "name": "Joe Adams",
+        "email": "github@joeadams.io",
+        "date": "2026-08-08T18:41:17Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-08-08T18:41:17Z"
+      },
+      "message": "Merge pull request #19194 from RajeshRajendiran/fix-msk-serverless-panic\n\ndiscovery/aws: fix MSK panic on clusters without provisioned config",
+      "tree": {
+        "sha": "88f5835267e0436a572748e2a89235c4516bc90f",
+        "url": "https://api.github.com/repos/prometheus/prometheus/git/trees/88f5835267e0436a572748e2a89235c4516bc90f"
+      },
+      "url": "https://api.github.com/repos/prometheus/prometheus/git/commits/5542b00b9d5933e29d7b597705c718b764bcc1cb",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqd3hNCRC1aQ7uu5UhlAAA4eoQAJe1WFdEDC/cZWod/Pp3tzqB\nniuQC5P4Z73eO7fK8lum+QzLrhb615+Jk4G5/ToEqW28tJH5CaAjbv+HJQJnYjYx\nIy39XSBvpbbtIDuOZpGeAj0In7/qhRhM4OXLIZmXk6Ju2aHmpkT4gaMl/kl+RXlN\nwBL5ODy6diGoMO/Q3KWmjeJX2OIqqouQURkhGxBG/bBYVpb4MWH9BWwx1BPLyCO4\nDQFvZFC9+XSWxEOhFceqwL9wstRj43CXcf77Li0LPNAGGvgZJkhMLE4Cc5L/dSiE\nn4kg59/XTEv+UMs1hNM8SSAFbRveQG3igGLFkHmleW+z47KVIf/WVvg2dMbOjxqP\nEr/JUVtx7jmUfiVJJ99RYrAO3aRIAmMruer9px3KCunBM0L7lsx9gf/DtAJ2qqqB\n07CQ6+IkO341gXvc/1DfsWAnWhRChNIB0m/yxMLYGO/PELWbCCeQkzvzd3JOgRnR\nN5Mr1oeJZAzi5pHvod4PlgYJExrliuykTTgnpszgGzIel3W01r6ph66JLrk5Dn1t\n3eCKPsjR5kzYwjaTUqzSgFeUNR7UKBA5ruDQjaZCRcY/nN0UtlR4V+8TMJkgUOLZ\nMePaMRvB/C/QFFt9krpt9PdZ5wzBVyP2F3yCakCEx3mn8Itm0W7bLFcNaH3+xuGs\ncan5ljZ02/nj9yDdlTdI\n=RnzH\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree 88f5835267e0436a572748e2a89235c4516bc90f\nparent 7a424f6a2e9df8e38b394e220cbe19f50609dde1\nparent 924c9fa1f4443d072faade2ef697d4373bba2ec0\nauthor Joe Adams <github@joeadams.io> 1786214477 -0400\ncommitter GitHub <noreply@github.com> 1786214477 -0400\n\nMerge pull request #19194 from RajeshRajendiran/fix-msk-serverless-panic\n\ndiscovery/aws: fix MSK panic on clusters without provisioned config",
+        "verified_at": "2026-08-08T18:41:21Z"
+      }
+    },
+    "url": "https://api.github.com/repos/prometheus/prometheus/commits/5542b00b9d5933e29d7b597705c718b764bcc1cb",
+    "html_url": "https://github.com/prometheus/prometheus/commit/5542b00b9d5933e29d7b597705c718b764bcc1cb",
+    "comments_url": "https://api.github.com/repos/prometheus/prometheus/commits/5542b00b9d5933e29d7b597705c718b764bcc1cb/comments",
+    "author": {
+      "login": "sysadmind",
+      "id": 2531691,
+      "node_id": "MDQ6VXNlcjI1MzE2OTE=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2531691?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/sysadmind",
+      "html_url": "https://github.com/sysadmind",
+      "followers_url": "https://api.github.com/users/sysadmind/followers",
+      "following_url": "https://api.github.com/users/sysadmind/following{/other_user}",
+      "gists_url": "https://api.github.com/users/sysadmind/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/sysadmind/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/sysadmind/subscriptions",
+      "organizations_url": "https://api.github.com/users/sysadmind/orgs",
+      "repos_url": "https://api.github.com/users/sysadmind/repos",
+      "events_url": "https://api.github.com/users/sysadmind/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/sysadmind/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "7a424f6a2e9df8e38b394e220cbe19f50609dde1",
+        "url": "https://api.github.com/repos/prometheus/prometheus/commits/7a424f6a2e9df8e38b394e220cbe19f50609dde1",
+        "html_url": "https://github.com/prometheus/prometheus/commit/7a424f6a2e9df8e38b394e220cbe19f50609dde1"
+      },
+      {
+        "sha": "924c9fa1f4443d072faade2ef697d4373bba2ec0",
+        "url": "https://api.github.com/repos/prometheus/prometheus/commits/924c9fa1f4443d072faade2ef697d4373bba2ec0",
+        "html_url": "https://github.com/prometheus/prometheus/commit/924c9fa1f4443d072faade2ef697d4373bba2ec0"
+      }
+    ]
+  },
+  {
+    "sha": "7a424f6a2e9df8e38b394e220cbe19f50609dde1",
+    "node_id": "C_kwDOAGhaidoAKDdhNDI0ZjZhMmU5ZGY4ZTM4YjM5NGUyMjBjYmUxOWY1MDYwOWRkZTE",
+    "commit": {
+      "author": {
+        "name": "Joe Adams",
+        "email": "github@joeadams.io",
+        "date": "2026-08-08T18:36:08Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-08-08T18:36:08Z"
+      },
+      "message": "Merge pull request #19333 from fallintoplace/fix-elasticache-truncated-arn\n\ndiscovery/aws: avoid panic on truncated ElastiCache ARNs",
+      "tree": {
+        "sha": "eb985f75b48df48030e078e2adc70ee711a2f7e2",
+        "url": "https://api.github.com/repos/prometheus/prometheus/git/trees/eb985f75b48df48030e078e2adc70ee711a2f7e2"
+      },
+      "url": "https://api.github.com/repos/prometheus/prometheus/git/commits/7a424f6a2e9df8e38b394e220cbe19f50609dde1",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqd3cYCRC1aQ7uu5UhlAAA+JgQAJhAOpxQ/H10iSSlm8YaVUVN\nCvZaDA+3qCgjWPqUCHFK5z+GyPzzch4EddcLfZscByRtWGFpzTu1sAUzOjHoojPw\nBFTnZhOZIWWUSVhtLmy8CJrz8saG7oeRHif3gwcEo+rD7lL3bA3gr+8I0fHZMLcV\nHLGu8J2Xp3RPtjnToMj6cfilAeXywwxjse5in5V7HgnlGKrvXbGTyr/fWislXPMr\nYTOKn3dOt2wNIs/zRtmnRG1yfo+bCX1cH5YsbwjXrDDdO2lJhzBZzvKswRAILDWa\nxrEiyWyq44Pl3V/oPvG1mTyhExjMHgEbYkbghJcqpMSYWTPJNQ1/tQkUyl4kPv/p\nOBf/XmTbrSWICqFJYScCMlQ9DqdKJluTGmk57L/xkUwyYpHUXI4GDhIrSIZjOywK\n4PencDfe3xSy552msR1Q40A7EYwmZEBCNSPlrX0MTVYRYwG4R24XtGeheas0WjWQ\nPxuKaafB9Lg2BZbiZiR2BSYNbn6Y/tknkJjVB8N0SsJNCmrjbWguGcjNoujxaF+P\nFO1eKZsLisTKqWSIvCjRzwm5wF6ptvO0THVeWf1wxQX+mWBBa8FMUmU/Kd7mGP8h\nO4+gV7v7miKK7BvO+ahevVBieLlsOog0y1yHmVqdTG/V1/7+/9u6xb2iIvRCm5Zr\nWOXuTPFTgOeeW1q93J5i\n=OthI\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree eb985f75b48df48030e078e2adc70ee711a2f7e2\nparent 08e3f7d0ee04d4b5c849a26930917c6b8bbe7512\nparent 361f1cc7777aa8f11fe7d3d0905b1e9f8e76967b\nauthor Joe Adams <github@joeadams.io> 1786214168 -0400\ncommitter GitHub <noreply@github.com> 1786214168 -0400\n\nMerge pull request #19333 from fallintoplace/fix-elasticache-truncated-arn\n\ndiscovery/aws: avoid panic on truncated ElastiCache ARNs",
+        "verified_at": "2026-08-08T18:36:11Z"
+      }
+    },
+    "url": "https://api.github.com/repos/prometheus/prometheus/commits/7a424f6a2e9df8e38b394e220cbe19f50609dde1",
+    "html_url": "https://github.com/prometheus/prometheus/commit/7a424f6a2e9df8e38b394e220cbe19f50609dde1",
+    "comments_url": "https://api.github.com/repos/prometheus/prometheus/commits/7a424f6a2e9df8e38b394e220cbe19f50609dde1/comments",
+    "author": {
+      "login": "sysadmind",
+      "id": 2531691,
+      "node_id": "MDQ6VXNlcjI1MzE2OTE=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2531691?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/sysadmind",
+      "html_url": "https://github.com/sysadmind",
+      "followers_url": "https://api.github.com/users/sysadmind/followers",
+      "following_url": "https://api.github.com/users/sysadmind/following{/other_user}",
+      "gists_url": "https://api.github.com/users/sysadmind/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/sysadmind/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/sysadmind/subscriptions",
+      "organizations_url": "https://api.github.com/users/sysadmind/orgs",
+      "repos_url": "https://api.github.com/users/sysadmind/repos",
+      "events_url": "https://api.github.com/users/sysadmind/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/sysadmind/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "08e3f7d0ee04d4b5c849a26930917c6b8bbe7512",
+        "url": "https://api.github.com/repos/prometheus/prometheus/commits/08e3f7d0ee04d4b5c849a26930917c6b8bbe7512",
+        "html_url": "https://github.com/prometheus/prometheus/commit/08e3f7d0ee04d4b5c849a26930917c6b8bbe7512"
+      },
+      {
+        "sha": "361f1cc7777aa8f11fe7d3d0905b1e9f8e76967b",
+        "url": "https://api.github.com/repos/prometheus/prometheus/commits/361f1cc7777aa8f11fe7d3d0905b1e9f8e76967b",
+        "html_url": "https://github.com/prometheus/prometheus/commit/361f1cc7777aa8f11fe7d3d0905b1e9f8e76967b"
+      }
+    ]
+  },
+  {
+    "sha": "08e3f7d0ee04d4b5c849a26930917c6b8bbe7512",
+    "node_id": "C_kwDOAGhaidoAKDA4ZTNmN2QwZWUwNGQ0YjVjODQ5YTI2OTMwOTE3YzZiOGJiZTc1MTI",
+    "commit": {
+      "author": {
+        "name": "Joe Adams",
+        "email": "github@joeadams.io",
+        "date": "2026-08-08T17:36:32Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-08-08T17:36:32Z"
+      },
+      "message": "Merge pull request #19324 from r0h1tb/fix/lightsail-nil-optional-fields\n\ndiscovery/aws: don't panic on Lightsail instances with absent optional fields",
+      "tree": {
+        "sha": "2c5166b0842b9a0716d9bdbfe4aeb13f0610a0da",
+        "url": "https://api.github.com/repos/prometheus/prometheus/git/trees/2c5166b0842b9a0716d9bdbfe4aeb13f0610a0da"
+      },
+      "url": "https://api.github.com/repos/prometheus/prometheus/git/commits/08e3f7d0ee04d4b5c849a26930917c6b8bbe7512",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqd2kgCRC1aQ7uu5UhlAAATG4QAGR925CVj0x3J+Q568ujBiq7\nxrmDDZGSQjacpICJSP0Gk+uX+vsbo8AuIC731tkNTMlwo3KiPazZ4TTWQsnZlKX3\nvFbAhOuPuBeW6JmUdCZpxpEm5HCrZV7Eb5a6vOdsAaJo4KVUEpWYCGD57uDpz2KA\nZC4fhOHdzrIGzy60ixjBf78Mdgd4+V0IrVfLRxK9KiwKxL3+4/S01X3jnsLbWaXI\nLKbSY9L0ytpTy/QamZARNFDf2CIpQ0Zkv8YsgcGBtVxl36eBmP8Dra777QWf0NIS\nnrSBwGx3iYCuulKHrgMO/ozzk3QklMEZxIDpkwVoYdRqlY6U4FHGGWj9ptnM4NGW\n5S/9KpW/8yACeQHOlR3F3LJwVmA3saHpBwF1tmgzMtOkIxAPHkDZZ58WUT+h/v5k\nAlLCVGblJCMOIP9EWtfy+goSrvrescUjB5Rkaz2F5+algUkDlufWZv5FU5Onr/V+\nZOntBgMoN7/KCavuU98lwPqN0GFiTE68DeInQthhkHSF4A/9C4FzMis5fqvXGAr/\nwY647UEp4WfrDK2SyHi4eD99je9i0MBKqT6f37TD5+mNJ6R7f7fNmvgvf0mGeZY6\nWNRfDvEVcl6eORUa/wA996Tf2z/W2xleM+Es5XYaa6Xdc4T0zPlQyG2BoQbbZ2EA\navFqUnZ5gBOw77ftiHSS\n=IAce\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree 2c5166b0842b9a0716d9bdbfe4aeb13f0610a0da\nparent e75af386be14c1229b3976d4b7adfff853a4022e\nparent 868c2b35219d31165cc9373545e941deb5f30a2b\nauthor Joe Adams <github@joeadams.io> 1786210592 -0400\ncommitter GitHub <noreply@github.com> 1786210592 -0400\n\nMerge pull request #19324 from r0h1tb/fix/lightsail-nil-optional-fields\n\ndiscovery/aws: don't panic on Lightsail instances with absent optional fields",
+        "verified_at": "2026-08-08T17:36:35Z"
+      }
+    },
+    "url": "https://api.github.com/repos/prometheus/prometheus/commits/08e3f7d0ee04d4b5c849a26930917c6b8bbe7512",
+    "html_url": "https://github.com/prometheus/prometheus/commit/08e3f7d0ee04d4b5c849a26930917c6b8bbe7512",
+    "comments_url": "https://api.github.com/repos/prometheus/prometheus/commits/08e3f7d0ee04d4b5c849a26930917c6b8bbe7512/comments",
+    "author": {
+      "login": "sysadmind",
+      "id": 2531691,
+      "node_id": "MDQ6VXNlcjI1MzE2OTE=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2531691?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/sysadmind",
+      "html_url": "https://github.com/sysadmind",
+      "followers_url": "https://api.github.com/users/sysadmind/followers",
+      "following_url": "https://api.github.com/users/sysadmind/following{/other_user}",
+      "gists_url": "https://api.github.com/users/sysadmind/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/sysadmind/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/sysadmind/subscriptions",
+      "organizations_url": "https://api.github.com/users/sysadmind/orgs",
+      "repos_url": "https://api.github.com/users/sysadmind/repos",
+      "events_url": "https://api.github.com/users/sysadmind/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/sysadmind/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "e75af386be14c1229b3976d4b7adfff853a4022e",
+        "url": "https://api.github.com/repos/prometheus/prometheus/commits/e75af386be14c1229b3976d4b7adfff853a4022e",
+        "html_url": "https://github.com/prometheus/prometheus/commit/e75af386be14c1229b3976d4b7adfff853a4022e"
+      },
+      {
+        "sha": "868c2b35219d31165cc9373545e941deb5f30a2b",
+        "url": "https://api.github.com/repos/prometheus/prometheus/commits/868c2b35219d31165cc9373545e941deb5f30a2b",
+        "html_url": "https://github.com/prometheus/prometheus/commit/868c2b35219d31165cc9373545e941deb5f30a2b"
+      }
+    ]
+  }
+]

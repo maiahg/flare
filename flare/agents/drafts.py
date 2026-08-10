@@ -34,7 +34,7 @@ class HypothesisDraft(BaseModel):
     created_by: str = "HypothesisAgent"
 
 class MitigationDraft(BaseModel):
-    """A proposed mitigation, with the four things §11.6 requires it to state."""
+    """A proposed mitigation, with the four things requires it to state."""
 
     ref: uuid.UUID = Field(default_factory=uuid.uuid4)
     title: str

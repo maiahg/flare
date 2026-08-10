@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import BaseModel, HttpUrl, PostgresDsn, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -65,6 +66,49 @@ class ToolBrokerSettings(BaseModel):
     rate_limit_per_min: int = 60
     call_timeout_s: int = 15
 
+
+class PrometheusSettings(BaseModel):
+    """Prometheus read endpoint."""
+
+    base_url: str = "http://localhost:9090"
+    query_set: Literal["default", "prometheus_self"] = "default"
+    queries: dict[str, str] = {}
+
+
+class LokiSettings(BaseModel):
+    """Loki read endpoint."""
+
+    base_url: str = "http://localhost:3100"
+    service_label: str = "service"
+
+
+class GitHubSettings(BaseModel):
+    """GitHub read access for deploys + code"""
+
+    api_url: str = "https://api.github.com"
+    repo: str | None = None
+    token: SecretStr | None = None
+
+
+class UnleashSettings(BaseModel):
+    """Unleash feature-flag read access"""
+
+    base_url: str = "http://localhost:4242"
+    token: SecretStr | None = None
+    project: str = "default"
+
+
+class ToolsSettings(BaseModel):
+    """Which provider backs the tool catalogue, and how to reach it"""
+
+    provider: Literal["synthetic", "real"] = "synthetic"
+    http_timeout_s: float = 5.0
+    max_response_bytes: int = 2_000_000
+    prometheus: PrometheusSettings = PrometheusSettings()
+    loki: LokiSettings = LokiSettings()
+    github: GitHubSettings = GitHubSettings()
+    unleash: UnleashSettings = UnleashSettings()
+
 class AdaptiveSettings(BaseModel):
     """Trigger scoring + debounce/coalesce tunables"""
 
@@ -100,6 +144,7 @@ class Settings(BaseSettings):
     llm: LLMSettings = LLMSettings()
     run_budget: RunBudgetSettings = RunBudgetSettings()
     tool_broker: ToolBrokerSettings = ToolBrokerSettings()
+    tools: ToolsSettings = ToolsSettings()
     adaptive: AdaptiveSettings = AdaptiveSettings()
     governor: GovernorSettings = GovernorSettings()
     mitigation: MitigationSettings = MitigationSettings()

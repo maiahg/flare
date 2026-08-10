@@ -1,0 +1,213 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "streams",
+    "result": [
+      {
+        "stream": {
+          "detected_level": "warn",
+          "level": "warn",
+          "service": "payments-svc",
+          "service_name": "payments-svc"
+        },
+        "values": [
+          [
+            "1786215054662092000",
+            "pool at capacity, 3 waiters"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "detected_level": "info",
+          "level": "info",
+          "service": "payments-svc",
+          "service_name": "payments-svc"
+        },
+        "values": [
+          [
+            "1786214994662092000",
+            "config reload: db.pool.max 50 -> 10"
+          ],
+          [
+            "1786214874662092000",
+            "pool size max=50 idle=12 acquiring ok"
+          ]
+        ]
+      },
+      {
+        "stream": {
+          "detected_level": "error",
+          "level": "error",
+          "service": "payments-svc",
+          "service_name": "payments-svc"
+        },
+        "values": [
+          [
+            "1786215354662092000",
+            "pool timeout acquiring connection after 5000ms"
+          ],
+          [
+            "1786215174662092000",
+            "pool timeout acquiring connection after 5000ms"
+          ],
+          [
+            "1786215114662092000",
+            "pool timeout acquiring connection after 5000ms"
+          ]
+        ]
+      }
+    ],
+    "stats": {
+      "summary": {
+        "bytesProcessedPerSecond": 67842,
+        "linesProcessedPerSecond": 1474,
+        "totalBytesProcessed": 460,
+        "totalLinesProcessed": 10,
+        "execTime": 0.00678,
+        "queueTime": 0.000551,
+        "subqueries": 0,
+        "totalEntriesReturned": 6,
+        "splits": 2,
+        "shards": 2,
+        "totalPostFilterLines": 6,
+        "totalStructuredMetadataBytesProcessed": 80
+      },
+      "querier": {
+        "store": {
+          "totalChunksRef": 0,
+          "totalChunksDownloaded": 0,
+          "chunksDownloadTime": 0,
+          "queryReferencedStructuredMetadata": false,
+          "chunk": {
+            "headChunkBytes": 0,
+            "headChunkLines": 0,
+            "decompressedBytes": 0,
+            "decompressedLines": 0,
+            "compressedBytes": 0,
+            "totalDuplicates": 0,
+            "postFilterLines": 0,
+            "headChunkStructuredMetadataBytes": 0,
+            "decompressedStructuredMetadataBytes": 0
+          },
+          "chunkRefsFetchTime": 0,
+          "congestionControlLatency": 0,
+          "pipelineWrapperFilteredLines": 0
+        }
+      },
+      "ingester": {
+        "totalReached": 2,
+        "totalChunksMatched": 5,
+        "totalBatches": 3,
+        "totalLinesSent": 6,
+        "store": {
+          "totalChunksRef": 0,
+          "totalChunksDownloaded": 0,
+          "chunksDownloadTime": 0,
+          "queryReferencedStructuredMetadata": false,
+          "chunk": {
+            "headChunkBytes": 460,
+            "headChunkLines": 10,
+            "decompressedBytes": 0,
+            "decompressedLines": 0,
+            "compressedBytes": 0,
+            "totalDuplicates": 0,
+            "postFilterLines": 6,
+            "headChunkStructuredMetadataBytes": 80,
+            "decompressedStructuredMetadataBytes": 0
+          },
+          "chunkRefsFetchTime": 310084,
+          "congestionControlLatency": 0,
+          "pipelineWrapperFilteredLines": 0
+        }
+      },
+      "cache": {
+        "chunk": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "index": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "result": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "statsResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "volumeResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "seriesResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "labelResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        },
+        "instantMetricResult": {
+          "entriesFound": 0,
+          "entriesRequested": 0,
+          "entriesStored": 0,
+          "bytesReceived": 0,
+          "bytesSent": 0,
+          "requests": 0,
+          "downloadTime": 0,
+          "queryLengthServed": 0
+        }
+      },
+      "index": {
+        "totalChunks": 0,
+        "postFilterChunks": 0,
+        "shardsDuration": 0
+      }
+    }
+  }
+}

@@ -405,11 +405,7 @@ async def list_incident_approvals(
     session: SessionDep,
     approval_status: Annotated[str | None, Query(alias="status")] = None,
 ) -> Sequence[Approval]:
-    """Approval requests, newest first.
-
-    Pending ones are the actionable list: each represents a branch of an
-    investigation waiting on a human (§7.6).
-    """
+    """Approval requests, newest first."""
     return await list_approvals(session, incident.id, status=approval_status)
 
 

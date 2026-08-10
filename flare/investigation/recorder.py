@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -13,8 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from flare.llm import LLMUsage
 from flare.models.tracing import AgentTrace, InvestigationRun, ToolCall
 from flare.tools import ToolBroker
-from flare.tools.synthetic import build_synthetic_broker
+from flare.tools.providers import build_broker
 
+BrokerFactory = Callable[..., ToolBroker]
 
 @dataclass
 class AgentStep:
@@ -32,12 +33,7 @@ class AgentStep:
     _extra: dict[str, Any] = field(default_factory=dict)
 
     def record_usage(self, usage: LLMUsage, *, fallback_model: str | None = None) -> None:
-        """Stamp an agent's LLM spend onto this trace.
-
-        ``fallback_model`` covers agents that returned before making any call
-        (e.g. a read agent whose probes were all empty), so the trace still
-        shows which model *would* have run.
-        """
+        """Stamp an agent's LLM spend onto this trace."""
         self.tokens = usage.as_dict()
         self.model_name = usage.model or fallback_model
         self.provider_request_id = usage.provider_request_id
@@ -55,6 +51,7 @@ class RunRecorder:
         trigger: dict[str, Any],
         created_by: str,
         scenario: str = "db_latency_spike",
+        broker_factory: BrokerFactory | None = None,
     ) -> None:
         self._sm = sessionmaker
         self._incident_id = incident_id
@@ -62,6 +59,7 @@ class RunRecorder:
         self._trigger = trigger
         self._created_by = created_by
         self._scenario = scenario
+        self._build_broker: BrokerFactory = broker_factory or build_broker
         self.run_id: uuid.UUID | None = None
         # Run-level rollup, accumulated as each agent step closes.
         self._total_in = 0
@@ -99,7 +97,7 @@ class RunRecorder:
             session.add(trace)
             await session.commit()  # durable before tool calls reference it
 
-            broker = build_synthetic_broker(
+            broker = self._build_broker(
                 session,
                 run_id=self.run_id,
                 incident_id=self._incident_id,

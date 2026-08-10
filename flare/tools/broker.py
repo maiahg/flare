@@ -36,8 +36,13 @@ class BrokeredResult:
     cached: bool
 
 
-def _hash_args(name: str, args: dict[str, Any]) -> str:
-    payload = json.dumps({"name": name, "args": args}, sort_keys=True, default=str)
+def _hash_args(name: str, args: dict[str, Any], provider: str) -> str:
+    """Cache/dedupe key. ``provider`` is part of it deliberately."""
+    payload = json.dumps(
+        {"name": name, "args": args, "provider": provider},
+        sort_keys=True,
+        default=str,
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -119,6 +124,17 @@ class ToolBroker:
     def allowlist(self) -> frozenset[str]:
         return frozenset(self._registry)
 
+
+    @property
+    def provider_fingerprint(self) -> str:
+        """Identifies *which implementations* are mounted, for cache keying."""
+        parts = sorted(
+            f"{name}:{type(tool).__module__}.{type(tool).__qualname__}"
+            for name, tool in self._registry.items()
+        )
+        return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
     def bind_trace(self, agent_trace_id: uuid.UUID) -> ToolBroker:
         """A shallow copy bound to a different agent trace (shares registry)."""
         clone = ToolBroker(
@@ -143,8 +159,8 @@ class ToolBroker:
             )
 
         redacted = _redact_args(args)
-        args_hash = _hash_args(name, redacted)
-
+        args_hash = _hash_args(name, redacted, self.provider_fingerprint)
+        
         cached = await self._cache_get(args_hash)
         if cached is not None:
             call_id = await self._audit(

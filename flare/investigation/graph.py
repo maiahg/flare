@@ -35,8 +35,7 @@ class InvestigationPoster(Protocol):
     ) -> None: ...
 
 class ApprovalPoster(Protocol):
-    """Posts an approval card. Separate from findings: an approval request is a
-    needed human confirmation, which §9 lists as always worth a post."""
+    """Posts an approval card."""
 
     async def post_approval(
         self, *, blocks: list[dict[str, Any]], text: str
@@ -105,9 +104,12 @@ def build_investigation_graph(
             async with deps.recorder.agent_step(name, seq) as step:
                 agent = agent_cls(deps.llm, step.broker, model=deps.models.default)
                 drafts = await agent.run(plan=state["plan"])
-                step.output = {"evidence": len(drafts)}
+                step.output = {
+                    "evidence": len(drafts),
+                    "limitations": agent.limitations,
+                }
                 step.record_usage(agent.usage, fallback_model=deps.models.default)
-        return {"evidence": drafts}
+        return {"evidence": drafts, "limitations": agent.limitations}
 
     async def telemetry(state: RunState) -> RunState:
         return await _read_node(state, TelemetryAgent, "TelemetryAgent", 1)

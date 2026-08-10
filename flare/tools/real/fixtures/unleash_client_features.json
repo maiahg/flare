@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "features": [
+    {
+      "name": "pay_v2",
+      "type": "release",
+      "enabled": true,
+      "project": "default",
+      "stale": false,
+      "strategies": [
+        {
+          "name": "flexibleRollout",
+          "constraints": [],
+          "parameters": {
+            "groupId": "pay_v2",
+            "rollout": "50",
+            "stickiness": "default"
+          },
+          "variants": []
+        }
+      ],
+      "variants": [],
+      "description": "New payments path \u2014 ramped to 50% at 13:58",
+      "impressionData": false
+    },
+    {
+      "name": "checkout_retry_budget",
+      "type": "operational",
+      "enabled": true,
+      "project": "default",
+      "stale": false,
+      "strategies": [
+        {
+          "name": "flexibleRollout",
+          "constraints": [],
+          "parameters": {
+            "groupId": "checkout_retry_budget",
+            "rollout": "50",
+            "stickiness": "default"
+          },
+          "variants": []
+        }
+      ],
+      "variants": [],
+      "description": "Retry budget for checkout-api upstream calls",
+      "impressionData": false
+    }
+  ],
+  "query": {
+    "project": [
+      "default"
+    ],
+    "environment": "development",
+    "inlineSegmentConstraints": true
+  },
+  "meta": {
+    "revisionId": 13,
+    "etag": "\"6ef7ec5a:13\"",
+    "queryHash": "6ef7ec5a"
+  }
+}
