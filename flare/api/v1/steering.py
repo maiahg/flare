@@ -57,7 +57,12 @@ router = APIRouter(tags=["steering"])
 
 async def _service(session: SessionDep, actor: ActorDep) -> SteeringService:
     """A steering service bound to this request's session + actor."""
-    return SteeringService(session, actor, llm=get_llm_client())
+    return SteeringService(
+        session,
+        actor,
+        llm=get_llm_client(),
+        model=get_settings().llm.models.postmortem,
+    )
 
 
 ServiceDep = Annotated[SteeringService, Depends(_service)]

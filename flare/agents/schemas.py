@@ -67,3 +67,22 @@ class MitigationOutput(BaseModel):
 
 class CommsDraftOutput(BaseModel):
     body: str = Field(description="the message text for this audience")
+
+
+class GroundedClaim(BaseModel):
+    """A sentence plus the evidence indices that support it."""
+
+    text: str = Field(description="one claim, stated plainly")
+    evidence_indices: list[int] = Field(
+        default_factory=list,
+        description="indices from the numbered EVIDENCE list that support this "
+        "claim; a claim with no supporting evidence must be omitted entirely",
+    )
+
+
+class PostmortemOutput(BaseModel):
+    """The narrative sections of a postmortem draft."""
+
+    impact: list[GroundedClaim] = Field(default_factory=list)
+    root_cause: list[GroundedClaim] = Field(default_factory=list)
+    contributing_factors: list[GroundedClaim] = Field(default_factory=list)

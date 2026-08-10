@@ -36,6 +36,7 @@ class LLMModelSettings(BaseModel):
     planner: str = DEFAULT_FAST_MODEL
     mitigation: str = DEFAULT_REASONING_MODEL
     comms: str = DEFAULT_REASONING_MODEL
+    postmortem: str = DEFAULT_REASONING_MODEL
 
 class LangfuseSettings(BaseModel):
     enabled: bool = False

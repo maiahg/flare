@@ -34,6 +34,11 @@ async def enqueue_comms_draft(payload: dict[str, Any]) -> None:
     pool = await get_arq_pool()
     await pool.enqueue_job("generate_comms_draft", payload)
 
+async def enqueue_postmortem(payload: dict[str, Any]) -> None:
+    """Generate a postmortem draft on the worker. """
+    pool = await get_arq_pool()
+    await pool.enqueue_job("generate_postmortem_draft", payload)
+
 
 async def enqueue_adaptive_run(payload: dict[str, Any], *, defer_by: int = 0) -> None:
     """Schedule the coalesced adaptive run ``defer_by`` seconds out"""

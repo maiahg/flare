@@ -7,7 +7,7 @@ from flare.pipeline.adaptive import run_adaptive_investigation
 from flare.pipeline.comms import generate_comms_draft
 from flare.pipeline.investigation import run_initial_investigation
 from flare.pipeline.messages import process_message
-
+from flare.pipeline.postmortem import generate_postmortem_draft
 
 def _redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(str(get_settings().redis_url))
@@ -28,6 +28,7 @@ class WorkerSettings:
         run_initial_investigation,
         run_adaptive_investigation,
         generate_comms_draft,
+        generate_postmortem_draft,
     ]
     redis_settings = _redis_settings()
     on_startup = on_startup

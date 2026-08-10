@@ -25,10 +25,10 @@ from flare.models.claims import (
     Hypothesis,
     OpenQuestion,
     PostmortemDraft,
-    Summary,
     TimelineEntry,
 )
 from flare.models.core import INCIDENT_MODES, Incident, User, Workspace
+from flare.postmortem import generate_postmortem
 from flare.steering.actors import Actor
 from flare.steering.errors import NotFoundError, ValidationError
 
@@ -95,10 +95,12 @@ class SteeringService:
         actor: Actor,
         *,
         llm: LLMClient | None = None,
+        model: str | None = None,
     ) -> None:
         self._session = session
         self._actor = actor
         self._llm = llm
+        self._model = model
         self._repo = MemoryRepository(session)
         self._after_commit: list[Callable[[], Awaitable[None]]] = []
 
@@ -460,67 +462,13 @@ class SteeringService:
 
     async def generate_postmortem(self, incident: Incident) -> PostmortemDraft:
         """Assemble a postmortem draft from current memory"""
-        summary = await self._session.scalar(
-            select(Summary.body)
-            .where(Summary.incident_id == incident.id, Summary.scope == "current")
-            .order_by(Summary.version.desc())
-            .limit(1)
+        return await generate_postmortem(
+            self._session,
+            incident,
+            actor=self._actor,
+            llm=self._llm,
+            model=self._model,
         )
-        facts = await self._active_text(Fact, incident, "statement")
-        hypotheses = await self._active_text(Hypothesis, incident, "statement")
-        timeline = await self._active_text(TimelineEntry, incident, "description")
-        decisions = await self._active_text(Decision, incident, "statement")
-        follow_ups = await self._active_text(ActionItem, incident, "description")
-
-        previous = await self._session.scalar(
-            select(PostmortemDraft.version)
-            .where(PostmortemDraft.incident_id == incident.id)
-            .order_by(PostmortemDraft.version.desc())
-            .limit(1)
-        )
-        draft = PostmortemDraft(
-            incident_id=incident.id,
-            version=int(previous or 0) + 1,
-            created_by=self._actor.ref,
-            sections={
-                "title": incident.title,
-                "status": incident.status,
-                "severity": incident.severity,
-                "summary": summary,
-                "timeline": timeline,
-                "what_we_know": facts,
-                "candidate_causes": hypotheses,
-                "decisions": decisions,
-                "generated": "stub",
-            },
-            follow_ups={"action_items": follow_ups},
-        )
-        self._session.add(draft)
-        await self._session.flush()
-        await self._repo.record_change(
-            entity_type_name=entity_type(PostmortemDraft),
-            entity_id=draft.id,
-            incident_id=incident.id,
-            op="create",
-            before=None,
-            after={"version": draft.version},
-            actor=self._actor.ref,
-            reason=self._actor.reason("generated a postmortem draft"),
-        )
-        return draft
-
-    async def _active_text(
-        self, model: type[Any], incident: Incident, field_name: str
-    ) -> list[str]:
-        rows = await self._session.scalars(
-            select(getattr(model, field_name))
-            .where(
-                model.incident_id == incident.id,
-                model.status.notin_(("rejected", "superseded", "stale")),
-            )
-            .order_by(model.created_at)
-        )
-        return [str(row) for row in rows if row]
 
     # ---- internals --------------------------------------------------------
 

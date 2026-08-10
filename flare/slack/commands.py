@@ -23,6 +23,7 @@ from flare.worker.enqueue import (
     enqueue_adaptive_run,
     enqueue_comms_draft,
     enqueue_initial_run,
+    enqueue_postmortem,
 )
 from sqlalchemy import select
 
@@ -36,7 +37,8 @@ _USAGE = (
     "`/flare investigate <what>`, `/flare validate <claim>`, "
     "`/flare correct \"what's wrong\"`, "
     "`/flare mode <quiet|scribe|assist|active>`, `/flare mitigation`, "
-    "`/flare draft-update <internal|support|status|exec>`, or a read: "
+    "`/flare draft-update <internal|support|status|exec>`, `/flare postmortem`, "
+    "or a read: "
     "`/flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
 )
 
@@ -91,6 +93,10 @@ async def handle(
         )
     if cmd.action == "mitigation":
         return await _handle_mitigation(
+            channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
+    if cmd.action == "postmortem":
+        return await _handle_postmortem(
             channel_id=channel_id, team_id=team_id, user_id=user_id
         )
     if cmd.action == "draft-update":
@@ -273,6 +279,24 @@ async def _handle_mitigation(
             actor=slack_actor(user_id or "unknown"),
             dashboard_url=_dashboard_url(incident.id),
         )
+
+
+async def _handle_postmortem(
+    *, channel_id: str, team_id: str, user_id: str | None
+) -> dict[str, Any]:
+    """`/flare postmortem` — generate/update the draft"""
+    async with get_sessionmaker()() as session:
+        incident = await incident_for_channel(session, channel_id, team_id=team_id)
+        if incident is None:
+            return _ephemeral("No flare incident is tracking this channel.")
+        incident_id = incident.id
+    await enqueue_postmortem(
+        {"incident_id": str(incident_id), "user_id": user_id}
+    )
+    return _ephemeral(
+        ":memo: Writing the postmortem draft from memory — every claim links to "
+        f"its evidence. It will appear at {_dashboard_url(incident_id)}"
+    )
 
 
 async def _handle_draft_update(
