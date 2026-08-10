@@ -59,3 +59,9 @@ Thumbs.db
 *.log
 *.sqlite3
 *.db
+
+# UI build
+*.next/
+*.node_modules/
+*.next-env.d.ts
+*.tsbuildinfo

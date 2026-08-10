@@ -108,7 +108,7 @@
           "slack"
         ],
         "summary": "Slack Interactions",
-        "description": "Interactivity endpoint: buttons and menus steer the incident (\u00a75).\n\nThe work happens inline \u2014 these are single-row steering writes, well inside\nSlack's 3s budget \u2014 and the confirmation goes back through ``response_url``.",
+        "description": "Interactivity endpoint: buttons, menus and modals steer the incident (\u00a75).\n\nThe work happens inline \u2014 these are single-row steering writes, well inside\nSlack's 3s budget \u2014 and the confirmation goes back through ``response_url``.\nA ``view_submission`` is answered with Slack's own ACK shape instead.",
         "operationId": "slack_interactions_slack_interactions_post",
         "responses": {
           "200": {
@@ -1932,6 +1932,156 @@
         }
       }
     },
+    "/api/v1/incidents/{incident_id}/comms/generate": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Generate Comms",
+        "description": "Write the next version of one audience's draft (\u00a75).\n\nDrafting is not sending, and this endpoint is not a send button: it appends\na ``comms_drafts`` row. Nothing in the comms package can reach Slack, email\nor a status page (\u00a711.2).",
+        "operationId": "generate_comms_api_v1_incidents__incident_id__comms_generate_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommsGenerate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommsDraftRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/comms/{comms_id}": {
+      "patch": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Edit Comms",
+        "description": "Edit a draft \u2014 stored as a new version, so the old text stays readable.",
+        "operationId": "edit_comms_api_v1_incidents__incident_id__comms__comms_id__patch",
+        "parameters": [
+          {
+            "name": "comms_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Comms Id"
+            }
+          },
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommsDraftPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommsDraftRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/incidents/{incident_id}/comms/{comms_id}/approve": {
       "post": {
         "tags": [
@@ -2772,6 +2922,21 @@
         "title": "ApprovalRead",
         "description": "An approval request. ``status`` is the whole point: pending blocks a\nbranch, and a decision records human intent \u2014 never an execution."
       },
+      "CommsDraftPatch": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "CommsDraftPatch",
+        "description": "A human's edit. Saved as a new version, never over the old text."
+      },
       "CommsDraftRead": {
         "properties": {
           "id": {
@@ -2916,6 +3081,21 @@
           "updated_at"
         ],
         "title": "CommsDraftRead"
+      },
+      "CommsGenerate": {
+        "properties": {
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "audience"
+        ],
+        "title": "CommsGenerate",
+        "description": "``{audience}`` \u2014 write the next version of one audience's draft."
       },
       "CorrectionCreate": {
         "properties": {

@@ -144,17 +144,22 @@ async def slack_commands_route(request: Request) -> dict[str, Any]:
     channel_id = form.get("channel_id", [""])[0]
     team_id = form.get("team_id", [""])[0]
     user_id = form.get("user_id", [""])[0] or None
+    trigger_id = form.get("trigger_id", [""])[0] or None
     _logger.info("slack command received", extra={"command": command, "text": text})
     if command == "/flare":
         return await slack_commands.handle(
-            text, channel_id=channel_id, team_id=team_id, user_id=user_id
+            text,
+            channel_id=channel_id,
+            team_id=team_id,
+            user_id=user_id,
+            trigger_id=trigger_id,
         )
     return {"response_type": "ephemeral", "text": f"Unknown command `{command}`."}
 
 
 @router.post("/interactions")
 async def slack_interactions(request: Request) -> dict[str, Any]:
-    """Interactivity endpoint: buttons and menus steer the incident"""
+    """Interactivity endpoint: buttons, menus and modals steer the incident"""
     body = await _verified_body(request)
     form = parse_qs(body)
     raw_payload = form.get("payload", ["{}"])[0]
@@ -166,7 +171,10 @@ async def slack_interactions(request: Request) -> dict[str, Any]:
         "slack interaction received",
         extra={"interaction_type": interaction.get("type")},
     )
-    return await handle_interaction(interaction)
+    result = await handle_interaction(interaction)
+    if interaction.get("type") == "view_submission":
+        return {k: v for k, v in result.items() if k in ("response_action", "errors")}
+    return result
 
 
 @router.get("/oauth/callback")

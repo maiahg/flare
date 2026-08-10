@@ -7,7 +7,7 @@ from flare.approvals import mitigation_view
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.llm import get_llm_client
-from flare.models.claims import TimelineEntry
+from flare.models.claims import COMMS_AUDIENCES, TimelineEntry
 from flare.models.core import INCIDENT_MODES, INCIDENT_SEVERITIES, Incident
 from flare.slack import views
 from flare.slack.blocks import ephemeral
@@ -16,9 +16,14 @@ from flare.slack.incident_ops import (
     get_workspace_by_team,
     incident_for_channel,
 )
+from flare.slack.modals import SlackModals, loading_view
 from flare.slack.posting import SlackPoster, post_incident_card
 from flare.steering import SteeringError, SteeringService, slack_actor
-from flare.worker.enqueue import enqueue_adaptive_run, enqueue_initial_run
+from flare.worker.enqueue import (
+    enqueue_adaptive_run,
+    enqueue_comms_draft,
+    enqueue_initial_run,
+)
 from sqlalchemy import select
 
 _TIMELINE_N = 10
@@ -30,7 +35,8 @@ _USAGE = (
     "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
     "`/flare investigate <what>`, `/flare validate <claim>`, "
     "`/flare correct \"what's wrong\"`, "
-    "`/flare mode <quiet|scribe|assist|active>`, `/flare mitigation`, or a read: "
+    "`/flare mode <quiet|scribe|assist|active>`, `/flare mitigation`, "
+    "`/flare draft-update <internal|support|status|exec>`, or a read: "
     "`/flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
 )
 
@@ -63,6 +69,7 @@ async def handle(
     channel_id: str,
     team_id: str = "",
     user_id: str | None = None,
+    trigger_id: str | None = None,
 ) -> dict[str, Any]:
     cmd = parse(command_text)
     if cmd.action == "start":
@@ -85,6 +92,14 @@ async def handle(
     if cmd.action == "mitigation":
         return await _handle_mitigation(
             channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
+    if cmd.action == "draft-update":
+        return await _handle_draft_update(
+            cmd.args,
+            channel_id=channel_id,
+            team_id=team_id,
+            user_id=user_id,
+            trigger_id=trigger_id,
         )
     if cmd.action in _READ_COMMANDS:
         return await _handle_read(
@@ -258,6 +273,54 @@ async def _handle_mitigation(
             actor=slack_actor(user_id or "unknown"),
             dashboard_url=_dashboard_url(incident.id),
         )
+
+
+async def _handle_draft_update(
+    args: list[str],
+    *,
+    channel_id: str,
+    team_id: str,
+    user_id: str | None,
+    trigger_id: str | None,
+) -> dict[str, Any]:
+    """`/flare draft-update <audience>` — open the draft modal"""
+    audience = (args[0].lower() if args else "").strip()
+    if audience not in COMMS_AUDIENCES:
+        return _ephemeral(
+            f"Usage: `/flare draft-update <{'|'.join(COMMS_AUDIENCES)}>`"
+        )
+
+    async with get_sessionmaker()() as session:
+        incident = await incident_for_channel(session, channel_id, team_id=team_id)
+        if incident is None:
+            return _ephemeral("No flare incident is tracking this channel.")
+        incident_id = incident.id
+
+    view_id: str | None = None
+    if trigger_id:
+        try:
+            view_id = await SlackModals().open(
+                trigger_id=trigger_id,
+                view=loading_view(incident_id=incident_id, audience=audience),
+            )
+        except Exception:  # noqa: BLE001 - dev may have no bot token
+            view_id = None
+
+    await enqueue_comms_draft(
+        {
+            "incident_id": str(incident_id),
+            "audience": audience,
+            "view_id": view_id,
+            "user_id": user_id,
+        }
+    )
+    if view_id:
+        return {"response_type": "ephemeral", "text": ""}
+    return _ephemeral(
+        f"Drafting the *{audience}* update — it will appear at "
+        f"{_dashboard_url(incident_id)}. Flare never sends it for you."
+    )
+
 
 async def _handle_read(
     action: str, args: list[str], *, channel_id: str, team_id: str

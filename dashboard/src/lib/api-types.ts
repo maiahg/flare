@@ -73,11 +73,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Slack Commands
-         * @description Slash command endpoint (``/flare``). ACKs ephemerally; no work yet.
-         */
-        post: operations["slack_commands_slack_commands_post"];
+        /** Slack Commands Route */
+        post: operations["slack_commands_route_slack_commands_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -95,7 +92,11 @@ export interface paths {
         put?: never;
         /**
          * Slack Interactions
-         * @description Interactivity endpoint (buttons/modals/menus). ACKs; no work yet.
+         * @description Interactivity endpoint: buttons, menus and modals steer the incident (§5).
+         *
+         *     The work happens inline — these are single-row steering writes, well inside
+         *     Slack's 3s budget — and the confirmation goes back through ``response_url``.
+         *     A ``view_submission`` is answered with Slack's own ACK shape instead.
          */
         post: operations["slack_interactions_slack_interactions_post"];
         delete?: never;
@@ -137,7 +138,11 @@ export interface paths {
          */
         get: operations["list_incidents_api_v1_incidents_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Incident
+         * @description Open an incident (§4.2).
+         */
+        post: operations["create_incident_api_v1_incidents_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -288,7 +293,8 @@ export interface paths {
         /** List Action Items */
         get: operations["list_action_items_api_v1_incidents__incident_id__action_items_get"];
         put?: never;
-        post?: never;
+        /** Create Action Item */
+        post: operations["create_action_item_api_v1_incidents__incident_id__action_items_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -412,6 +418,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/incidents/{incident_id}/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Triggers
+         * @description Trigger decisions for an incident, newest first (§7.4).
+         *
+         *     Includes ``skip`` decisions on purpose: the suppressed ones are exactly
+         *     what you want to audit when the bot felt too quiet or too noisy.
+         */
+        get: operations["list_triggers_api_v1_incidents__incident_id__triggers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Incident Approvals
+         * @description Approval requests, newest first.
+         *
+         *     Pending ones are the actionable list: each represents a branch of an
+         *     investigation waiting on a human (§7.6).
+         */
+        get: operations["list_incident_approvals_api_v1_incidents__incident_id__approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/incidents/{incident_id}/revisions": {
         parameters: {
             query?: never;
@@ -426,6 +478,275 @@ export interface paths {
         get: operations["list_revisions_api_v1_incidents__incident_id__revisions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Mode
+         * @description Set the behavior mode: quiet | scribe | assist | active (§9.5).
+         */
+        post: operations["set_mode_api_v1_incidents__incident_id__mode_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/investigate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Investigate
+         * @description Queue a manual, targeted, read-only run (§4.3).
+         *
+         *     202, not 200: the run executes on the worker. Returning only once it
+         *     finished would hold the request open for the whole investigation budget.
+         */
+        post: operations["investigate_api_v1_incidents__incident_id__investigate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/facts/{fact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Fact
+         * @description Correct a fact's wording, or mark it stale/rejected.
+         */
+        patch: operations["patch_fact_api_v1_incidents__incident_id__facts__fact_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/hypotheses/{hypothesis_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Hypothesis
+         * @description Confirm or reject a hypothesis (§11.9: a rejection is permanent).
+         */
+        patch: operations["patch_hypothesis_api_v1_incidents__incident_id__hypotheses__hypothesis_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/evidence/{evidence_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Evidence
+         * @description Mark evidence stale — the only mutation an observation allows (§3.3).
+         */
+        patch: operations["patch_evidence_api_v1_incidents__incident_id__evidence__evidence_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/questions/{question_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Question
+         * @description Assign an owner, record an answer, or close a question.
+         */
+        patch: operations["patch_question_api_v1_incidents__incident_id__questions__question_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/action-items/{action_item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Action Item */
+        patch: operations["patch_action_item_api_v1_incidents__incident_id__action_items__action_item_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/comms/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Comms
+         * @description Write the next version of one audience's draft (§5).
+         *
+         *     Drafting is not sending, and this endpoint is not a send button: it appends
+         *     a ``comms_drafts`` row. Nothing in the comms package can reach Slack, email
+         *     or a status page (§11.2).
+         */
+        post: operations["generate_comms_api_v1_incidents__incident_id__comms_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/comms/{comms_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Comms
+         * @description Edit a draft — stored as a new version, so the old text stays readable.
+         */
+        patch: operations["edit_comms_api_v1_incidents__incident_id__comms__comms_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/comms/{comms_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Comms
+         * @description Approve a draft. Approval marks it approved; it never sends (§11.2).
+         */
+        post: operations["approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/approvals/{approval_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide
+         * @description Approve or reject a gated recommendation (§4.3 / §7.6).
+         *
+         *     Approval **records intent only**. It flips the approval row and the
+         *     mitigation's status and releases the paused branch so it can finish
+         *     recording the outcome — it never applies the mitigation, and there is no
+         *     adapter it could apply one with (§11.1).
+         */
+        post: operations["decide_api_v1_incidents__incident_id__approvals__approval_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Correction
+         * @description Record a human correction; Scribe reconciles what it invalidates (§4.3).
+         */
+        post: operations["submit_correction_api_v1_incidents__incident_id__corrections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/postmortem/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Postmortem
+         * @description Generate (or regenerate) the postmortem draft from current memory.
+         */
+        post: operations["generate_postmortem_api_v1_incidents__incident_id__postmortem_generate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -456,6 +777,22 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActionItemCreate */
+        ActionItemCreate: {
+            /** Description */
+            description: string;
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Due At */
+            due_at?: string | null;
+        };
+        /** ActionItemPatch */
+        ActionItemPatch: {
+            /** Status */
+            status?: string | null;
+            /** Owner User Id */
+            owner_user_id?: string | null;
+        };
         /** ActionItemRead */
         ActionItemRead: {
             /**
@@ -551,6 +888,62 @@ export interface components {
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallRead"][];
         };
+        /**
+         * ApprovalDecision
+         * @description ``{decision: approved|rejected, note?}`` — §4.3 ``POST /approvals/{id}``.
+         */
+        ApprovalDecision: {
+            /** Decision */
+            decision: string;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * ApprovalRead
+         * @description An approval request. ``status`` is the whole point: pending blocks a
+         *     branch, and a decision records human intent — never an execution.
+         */
+        ApprovalRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Incident Id
+             * Format: uuid
+             */
+            incident_id: string;
+            /** Subject Type */
+            subject_type?: string | null;
+            /** Subject Id */
+            subject_id?: string | null;
+            /** Requested By */
+            requested_by?: string | null;
+            /** Requested At */
+            requested_at?: string | null;
+            /** Status */
+            status: string;
+            /** Decided By */
+            decided_by?: string | null;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * CommsDraftPatch
+         * @description A human's edit. Saved as a new version, never over the old text.
+         */
+        CommsDraftPatch: {
+            /** Body */
+            body: string;
+        };
         /** CommsDraftRead */
         CommsDraftRead: {
             /**
@@ -595,6 +988,39 @@ export interface components {
             body?: string | null;
             /** Version */
             version?: number | null;
+        };
+        /**
+         * CommsGenerate
+         * @description ``{audience}`` — write the next version of one audience's draft.
+         */
+        CommsGenerate: {
+            /** Audience */
+            audience: string;
+        };
+        /** CorrectionCreate */
+        CorrectionCreate: {
+            /** Correction Text */
+            correction_text: string;
+            /** Entity Type */
+            entity_type?: string | null;
+            /** Entity Id */
+            entity_id?: string | null;
+        };
+        /**
+         * CorrectionResult
+         * @description What the correction recorded, and what it invalidated.
+         */
+        CorrectionResult: {
+            fact: components["schemas"]["FactRead"];
+            /** Invalidated */
+            invalidated?: {
+                [key: string]: string;
+            }[];
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** DecisionRead */
         DecisionRead: {
@@ -642,6 +1068,14 @@ export interface components {
             decided_at?: string | null;
             /** Rationale */
             rationale?: string | null;
+        };
+        /**
+         * EvidencePatch
+         * @description Evidence accepts exactly one edit: marking it stale (§3.3).
+         */
+        EvidencePatch: {
+            /** Status */
+            status: string;
         };
         /** EvidenceRead */
         EvidenceRead: {
@@ -700,6 +1134,13 @@ export interface components {
             /** Staleness At */
             staleness_at?: string | null;
         };
+        /** FactPatch */
+        FactPatch: {
+            /** Statement */
+            statement?: string | null;
+            /** Status */
+            status?: string | null;
+        };
         /** FactRead */
         FactRead: {
             /**
@@ -745,6 +1186,13 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HypothesisPatch */
+        HypothesisPatch: {
+            /** Status */
+            status?: string | null;
+            /** Rank */
+            rank?: number | null;
         };
         /** HypothesisRead */
         HypothesisRead: {
@@ -795,9 +1243,24 @@ export interface components {
             /** Contradicting Evidence */
             contradicting_evidence?: components["schemas"]["EvidenceRead"][];
         };
+        /** IncidentCreate */
+        IncidentCreate: {
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Channel Id */
+            channel_id?: string | null;
+            /** Alert Payload */
+            alert_payload?: {
+                [key: string]: unknown;
+            } | null;
+            /** Workspace Id */
+            workspace_id?: string | null;
+        };
         /**
          * IncidentDetail
-         * @description Overview payload: the incident, its current summary, and counts.
+         * @description Overview payload: the incident, its current summary, and counts (§4.2).
          */
         IncidentDetail: {
             /**
@@ -948,6 +1411,15 @@ export interface components {
              */
             mitigation_options: number;
         };
+        /** InvestigateRequest */
+        InvestigateRequest: {
+            /** Target */
+            target?: string | null;
+            /** Since */
+            since?: string | null;
+            /** Focus */
+            focus?: string | null;
+        };
         /** MitigationOptionRead */
         MitigationOptionRead: {
             /**
@@ -998,6 +1470,11 @@ export interface components {
             expected_benefit?: string | null;
             /** Approval Required */
             approval_required?: boolean | null;
+        };
+        /** ModeUpdate */
+        ModeUpdate: {
+            /** Mode */
+            mode: string;
         };
         /** OpenQuestionRead */
         OpenQuestionRead: {
@@ -1079,6 +1556,15 @@ export interface components {
              */
             updated_at: string;
         };
+        /** QuestionPatch */
+        QuestionPatch: {
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Answer */
+            answer?: string | null;
+        };
         /** RevisionRead */
         RevisionRead: {
             /**
@@ -1125,8 +1611,28 @@ export interface components {
             created_at: string;
         };
         /**
+         * RunAccepted
+         * @description A manual run was queued (it executes on the worker, not in-request).
+         */
+        RunAccepted: {
+            /**
+             * Status
+             * @default queued
+             */
+            status: string;
+            /**
+             * Incident Id
+             * Format: uuid
+             */
+            incident_id: string;
+            /** Target */
+            target?: string | null;
+            /** Focus */
+            focus?: string | null;
+        };
+        /**
          * RunDetail
-         * @description A run plus its agent traces and the tool calls beneath them.
+         * @description A run plus its agent traces and the tool calls beneath them (§4.2).
          */
         RunDetail: {
             /**
@@ -1344,6 +1850,43 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * TriggerRead
+         * @description One trigger decision, with the reasons that produced it.
+         *
+         *     Exposed because "why did/didn't the bot investigate that message?" has to
+         *     be answerable without reading logs — the reasons list carries both the
+         *     novelty verdicts and any classifier commentary.
+         */
+        TriggerRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Incident Id
+             * Format: uuid
+             */
+            incident_id: string;
+            /** Message Id */
+            message_id?: string | null;
+            /** Decision */
+            decision?: string | null;
+            /** Score */
+            score?: number | null;
+            /** Reasons */
+            reasons?: {
+                [key: string]: unknown;
+            } | null;
+            /** Run Id */
+            run_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1432,7 +1975,7 @@ export interface operations {
             };
         };
     };
-    slack_commands_slack_commands_post: {
+    slack_commands_route_slack_commands_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1448,7 +1991,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: string;
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -1470,7 +2013,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: boolean;
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -1529,6 +2072,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IncidentRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_incident_api_v1_incidents_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentRead"];
                 };
             };
             /** @description Validation Error */
@@ -1803,6 +2381,43 @@ export interface operations {
             };
         };
     };
+    create_action_item_api_v1_incidents__incident_id__action_items_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_timeline_api_v1_incidents__incident_id__timeline_get: {
         parameters: {
             query?: never;
@@ -1992,6 +2607,73 @@ export interface operations {
             };
         };
     };
+    list_triggers_api_v1_incidents__incident_id__triggers_get: {
+        parameters: {
+            query?: {
+                decision?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_incident_approvals_api_v1_incidents__incident_id__approvals_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_revisions_api_v1_incidents__incident_id__revisions_get: {
         parameters: {
             query?: {
@@ -2026,6 +2708,487 @@ export interface operations {
             };
         };
     };
+    set_mode_api_v1_incidents__incident_id__mode_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    investigate_api_v1_incidents__incident_id__investigate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvestigateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_fact_api_v1_incidents__incident_id__facts__fact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                fact_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_hypothesis_api_v1_incidents__incident_id__hypotheses__hypothesis_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                hypothesis_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HypothesisPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HypothesisRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_evidence_api_v1_incidents__incident_id__evidence__evidence_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                evidence_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidencePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_question_api_v1_incidents__incident_id__questions__question_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                question_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenQuestionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_action_item_api_v1_incidents__incident_id__action_items__action_item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                action_item_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionItemPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_comms_api_v1_incidents__incident_id__comms_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommsGenerate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommsDraftRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_comms_api_v1_incidents__incident_id__comms__comms_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                comms_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommsDraftPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommsDraftRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                comms_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommsDraftRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_api_v1_incidents__incident_id__approvals__approval_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                approval_id: string;
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_correction_api_v1_incidents__incident_id__corrections_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_postmortem_api_v1_incidents__incident_id__postmortem_generate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostmortemDraftRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     stream_incident_api_v1_incidents__incident_id__stream_get: {
         parameters: {
             query?: never;
@@ -2037,7 +3200,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Live incident events. */
+            /** @description Live incident events (§4.4). */
             200: {
                 headers: {
                     [name: string]: unknown;

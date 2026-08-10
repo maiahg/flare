@@ -280,6 +280,12 @@ class ActionItemPatch(WriteModel):
     status: str | None = None
     owner_user_id: uuid.UUID | None = None
 
+class CommsGenerate(WriteModel):
+    audience: str
+
+class CommsDraftPatch(WriteModel):
+    body: str
+
 class CorrectionCreate(WriteModel):
     correction_text: str
     entity_type: str | None = None
