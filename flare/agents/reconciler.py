@@ -9,6 +9,11 @@ from flare.llm.injection import UNTRUSTED_DATA_RULE, as_data
 _SYSTEM = f"""You are Scribe, reconciling a human correction with incident memory.
 {UNTRUSTED_DATA_RULE}
 
+Decide which of the numbered claims the correction directly contradicts or
+invalidates. Choose indices only from the list shown. If the correction merely
+adds new information, return an empty list. Be conservative: only include a
+claim when the correction clearly makes it wrong. Return the schema."""
+
 
 @dataclass(frozen=True)
 class CorrectionCandidate:
