@@ -1,91 +1,72 @@
 from __future__ import annotations
 
-import json
 import uuid
-from typing import Any
 
 from redis.asyncio import Redis
 
-_PREFIX = "flare:coalesce:"
+_INFLIGHT_PREFIX = "flare:inflight:"
+_CANCEL_PREFIX = "flare:cancel:"
+
+#: Safety valve: an in-flight marker outlives any sane run but not the incident.
+DEFAULT_INFLIGHT_TTL_S = 15 * 60
+DEFAULT_CANCEL_TTL_S = 15 * 60
 
 
-def pending_key(incident_id: uuid.UUID) -> str:
-    return f"{_PREFIX}{incident_id}:pending"
+def inflight_key(incident_id: uuid.UUID) -> str:
+    return f"{_INFLIGHT_PREFIX}{incident_id}"
 
 
-def window_key(incident_id: uuid.UUID) -> str:
-    return f"{_PREFIX}{incident_id}:window"
+def cancel_key(run_id: uuid.UUID) -> str:
+    return f"{_CANCEL_PREFIX}{run_id}"
 
 
-async def add_pending(
+async def register_run(
     redis: Redis,
     incident_id: uuid.UUID,
-    payload: dict[str, Any],
+    run_id: uuid.UUID,
     *,
-    ttl_s: int,
+    ttl_s: int = DEFAULT_INFLIGHT_TTL_S,
 ) -> None:
-    """Queue one message's context for the next run, without opening a window."""
-    key = pending_key(incident_id)
-    pipe = redis.pipeline()
-    pipe.rpush(key, json.dumps(payload, default=str))
-    pipe.expire(key, ttl_s)
-    await pipe.execute()
+    """Mark ``run_id`` as the incident's in-flight run."""
+    await redis.set(inflight_key(incident_id), str(run_id), ex=ttl_s)
 
 
-async def open_window(redis: Redis, incident_id: uuid.UUID, *, window_s: int) -> bool:
-    """Try to open the coalesce window. ``True`` means *you* must schedule the run."""
-    was_set = await redis.set(window_key(incident_id), "1", nx=True, ex=window_s)
-    return bool(was_set)
+async def current_run(redis: Redis, incident_id: uuid.UUID) -> uuid.UUID | None:
+    """The run currently executing for this incident, if any."""
+    raw = await redis.get(inflight_key(incident_id))
+    if raw is None:
+        return None
+    try:
+        return uuid.UUID(raw.decode() if isinstance(raw, bytes) else str(raw))
+    except ValueError:  # pragma: no cover - defensive
+        return None
 
 
-async def drain(
-    redis: Redis, incident_id: uuid.UUID, *, limit: int
-) -> list[dict[str, Any]]:
-    """Take everything queued for this incident and close the window."""
-    pipe = redis.pipeline()
-    pipe.lrange(pending_key(incident_id), 0, -1)
-    pipe.delete(pending_key(incident_id))
-    pipe.delete(window_key(incident_id))
-    raw, *_ = await pipe.execute()
-
-    items: list[dict[str, Any]] = []
-    for entry in raw[-limit:] if limit else raw:
-        try:
-            decoded = json.loads(entry)
-        except (TypeError, ValueError):
-            continue
-        if isinstance(decoded, dict):
-            items.append(decoded)
-    return items
+async def clear_run(redis: Redis, incident_id: uuid.UUID, run_id: uuid.UUID) -> None:
+    """Release the in-flight marker, but only if we still own it."""
+    holder = await current_run(redis, incident_id)
+    if holder == run_id:
+        await redis.delete(inflight_key(incident_id))
 
 
-def merge_context(items: list[dict[str, Any]]) -> dict[str, Any]:
-    """Fold coalesced message payloads into one trigger context."""
-    messages: list[dict[str, Any]] = []
-    signals: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
-    reasons: list[str] = []
+async def request_supersede(
+    redis: Redis,
+    incident_id: uuid.UUID,
+    *,
+    ttl_s: int = DEFAULT_CANCEL_TTL_S,
+) -> uuid.UUID | None:
+    """Tombstone the in-flight run (if any) and return its id."""
+    run_id = await current_run(redis, incident_id)
+    if run_id is None:
+        return None
+    await redis.set(cancel_key(run_id), "1", ex=ttl_s)
+    return run_id
 
-    for item in items:
-        messages.append(
-            {
-                "slack_ts": item.get("slack_ts"),
-                "user_id": item.get("user_id"),
-                "text": item.get("text", ""),
-            }
-        )
-        reasons.extend(item.get("reasons", []))
-        for signal in item.get("signals", []):
-            key = (str(signal.get("type", "")), str(signal.get("text", "")))
-            if key in seen:
-                continue
-            seen.add(key)
-            signals.append(signal)
 
-    return {
-        "reason": "adaptive",
-        "messages": messages,
-        "signals": signals,
-        "reasons": reasons[:20],
-        "coalesced": len(items),
-    }
+async def is_superseded(redis: Redis, run_id: uuid.UUID) -> bool:
+    """Has this run been tombstoned? Polled at every graph checkpoint."""
+    return bool(await redis.exists(cancel_key(run_id)))
+
+
+async def clear_supersede(redis: Redis, run_id: uuid.UUID) -> None:
+    await redis.delete(cancel_key(run_id))

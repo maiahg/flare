@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from flare.events.bus import EVENT_SLACK_POSTED, Event, publish
-from flare.secrets import slack_bot_token
+from flare.secrets import get_slack_bot_token
 
 _PROACTIVE_MODES = frozenset({"assist", "active"})
 _SLACK_POST_URL = "https://slack.com/api/chat.postMessage"
@@ -24,7 +24,7 @@ class SlackPoster:
     """Minimal `chat.postMessage` client using the bot token."""
 
     def __init__(self, token: str | None = None) -> None:
-        self._token = token if token is not None else slack_bot_token()
+        self._token = token if token is not None else get_slack_bot_token()
 
     async def post_message(
         self,

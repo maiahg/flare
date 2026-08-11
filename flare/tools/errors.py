@@ -22,4 +22,4 @@ class ToolArgsError(ToolError):
 
 
 class MutatingToolError(ToolError):
-    """Raised when something tries to mount an adapter that can change the world.
+    """Raised when something tries to mount an adapter that can change the world."""

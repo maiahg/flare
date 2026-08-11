@@ -86,7 +86,7 @@ def _balanced(text: str) -> str | None:
 def _parses(candidate: str) -> bool:
     try:
         json.loads(candidate)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return False
     return True
 
