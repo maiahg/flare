@@ -1,0 +1,30 @@
+display_information:
+  name: flare
+features:
+  bot_user:
+    display_name: flare
+    always_online: true
+  slash_commands:
+    - command: /flare
+      url: https://holder-bits-usc-dui.trycloudflare.com/slack/commands
+      description: Incident copilot
+      usage_hint: 'start "title" --sev sev2'
+oauth_config:
+  redirect_urls:
+    - https://holder-bits-usc-dui.trycloudflare.com/slack/oauth/callback
+  scopes:
+    bot:
+      - commands
+      - chat:write
+      - channels:history
+      - channels:read
+settings:
+  event_subscriptions:
+    request_url: https://holder-bits-usc-dui.trycloudflare.com/slack/events
+    bot_events:
+      - message.channels
+      - member_joined_channel
+  interactivity:
+    is_enabled: true
+    request_url: https://holder-bits-usc-dui.trycloudflare.com/slack/interactions
+
