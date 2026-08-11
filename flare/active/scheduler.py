@@ -27,7 +27,7 @@ def active_key(incident_id: uuid.UUID) -> str:
 
 
 def recovery_key(incident_id: uuid.UUID) -> str:
-    """The key that makes the recovery post exactly-once (§9.1)."""
+    """The key that makes the recovery post exactly-once."""
     return f"{_RECOVERY_PREFIX}announced:{incident_id}"
 
 

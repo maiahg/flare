@@ -44,6 +44,12 @@ class LangfuseSettings(BaseModel):
     public_key: SecretStr | None = None
     seceret_key: SeceretStr | None = None
 
+class LLMRateLimitSettings(BaseModel):
+    max_retries: int = 3
+    base_delay_s: float = 1.0
+    max_delay_s: float = 20.0
+
+
 class LLMSettings(BaseModel):
     provider: LLMProviderSettings = LLMProviderSettings()
     models: LLMModelSettings = LLMModelSettings()
@@ -59,6 +65,11 @@ class RunBudgetSettings(BaseModel):
     max_wall_clock_s: int = 90
     fan_out_concurrency: int = 4
     max_critic_revisions: int = 2
+
+
+class IncidentBudgetSettings(BaseModel):
+    max_tokens: int = 2_000_000
+    warn_ratio: float = 0.8
 
 
 class ToolBrokerSettings(BaseModel):
@@ -164,6 +175,7 @@ class Settings(BaseSettings):
     slack: SlackSettings
     llm: LLMSettings = LLMSettings()
     run_budget: RunBudgetSettings = RunBudgetSettings()
+    incident_budget: IncidentBudgetSettings = IncidentBudgetSettings()
     tool_broker: ToolBrokerSettings = ToolBrokerSettings()
     tools: ToolsSettings = ToolsSettings()
     adaptive: AdaptiveSettings = AdaptiveSettings()

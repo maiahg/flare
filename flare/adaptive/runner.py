@@ -17,6 +17,7 @@ from flare.agents.planner import (
     InvestigationPlannerAgent,
 )
 from flare.agents.schemas import ExtractedSignal
+from flare.budgets import check_incident_budget
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.investigation.graph import (
@@ -103,6 +104,18 @@ async def start_adaptive_run(
     await supersede.clear_supersede(redis, run_id)
     await supersede.register_run(redis, incident_id, run_id)
 
+    verdict = await check_incident_budget(incident_id)
+    if not verdict.allowed:
+        _logger.warning(
+            "incident %s is over its token budget; refusing an adaptive run",
+            incident_id,
+            extra={"used": verdict.used, "limit": verdict.limit},
+        )
+        await recorder.finish(
+            status="cancelled", limitations=[verdict.limitation()], summary=None
+        )
+        return run_id
+
     if not dashboard_url:
         base = str(settings.app_base_url).rstrip("/")
         dashboard_url = f"{base}/incidents/{incident_id}"
@@ -122,6 +135,8 @@ async def start_adaptive_run(
             plan = await planner.run(verdicts=verdicts)
             step.output = {"agents": plan.agents, "focus": plan.focus}
             step.record_usage(planner.usage, fallback_model=settings.llm.models.planner)
+    plan.service = plan.service or trigger.get("service")
+    plan.suspect_service = plan.suspect_service or trigger.get("suspect_service")
     await recorder.save_plan(dict(plan.as_dict()))
 
     async def cancelled() -> bool:

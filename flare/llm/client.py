@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import random
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
@@ -37,6 +39,27 @@ class _RawCompletion:
     tokens_out: int | None
     request_id: str | None
 
+
+@dataclass
+class _Attempts:
+    """Two independent counters for one call: schema repairs and 429 retries."""
+
+    repairs: int = 0
+    rate_limits: int = 0
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    response = getattr(exc, "response", None)
+    header = getattr(response, "headers", {}) or {}
+    raw = header.get("retry-after") or header.get("Retry-After")
+    if raw is None:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return None
+
+
 class OpenAICompatibleClient:
     """Structured-output client over OpenRouter's OpenAI-compatible endpoint"""
 
@@ -60,7 +83,31 @@ class OpenAICompatibleClient:
         )
         self._default_model = settings.llm.models.default
         self._max_repair = settings.llm.max_repair_attempts
-    
+        self._rate_limit = settings.llm.rate_limit  
+
+
+    async def _backoff(self, attempts: _Attempts, exc: Exception) -> bool:
+        if attempts.rate_limits >= self._rate_limit.max_retries:
+            return False
+        attempts.rate_limits += 1
+        advised = _retry_after_seconds(exc)
+        delay = (
+            advised
+            if advised is not None
+            else self._rate_limit.base_delay_s * (2 ** (attempts.rate_limits - 1))
+        )
+        delay = min(delay, self._rate_limit.max_delay_s)
+        delay *= 1 + random.random() * 0.25
+        _logger.warning(
+            "Provider rate limited (attempt %d/%d); waiting %.1fs",
+            attempts.rate_limits,
+            self._rate_limit.max_retries,
+            delay,
+        )
+        await asyncio.sleep(delay)
+        return True
+
+
     async def _call_chat(
         self,
         *,
@@ -163,7 +210,8 @@ class OpenAICompatibleClient:
         turns: list[dict[str, str]] = [{"role": "user", "content": user}]
 
         last_error: Exception | None = None
-        for _attempt in range(self._max_repair + 1):
+        attempts = _Attempts()
+        while attempts.repairs <= self._max_repair:
             use_responses = model_id in _RESPONSES_ONLY_MODELS
             try:
                 if use_responses:
@@ -183,9 +231,13 @@ class OpenAICompatibleClient:
                         response_format=response_format,
                     )
             except RateLimitError as exc:
+                if await self._backoff(attempts, exc):
+                    continue
                 raise RateLimitedError(str(exc)) from exc
             except APIStatusError as exc:
                 if exc.status_code == 429:
+                    if await self._backoff(attempts, exc):
+                        continue
                     raise RateLimitedError(str(exc)) from exc
                 raise
 
@@ -209,6 +261,7 @@ class OpenAICompatibleClient:
                 value = schema.model_validate_json(raw.content)
             except (ValidationError, json.JSONDecodeError) as exc:
                 last_error = exc
+                attempts.repairs += 1
                 turns.append({"role": "assistant", "content": raw.content})
                 turns.append(
                     {

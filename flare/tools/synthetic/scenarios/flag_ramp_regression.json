@@ -1,0 +1,49 @@
+{
+  "name": "flag_ramp_regression",
+  "incident_summary": "search-api error rate climbing since 09:12, coincident with the search_v3 flag ramp 10 -> 100.",
+  "_note": "Carries a decoy change event: deploy 5100 landed 17 minutes BEFORE the error rate moved and only touched docs. A root-cause pick that keys on 'a deploy happened' rather than on what the deploy did will name the wrong one.",
+  "metrics": {
+    "search-api": {
+      "p99_ms": { "09:05": 210, "09:10": 215, "09:12": 480, "09:20": 505 },
+      "error_rate": { "09:05": 0.4, "09:10": 0.5, "09:12": 7.8, "09:20": 8.4 }
+    },
+    "catalog-svc": {
+      "p99_ms": { "09:05": 88, "09:12": 91, "09:20": 90 },
+      "error_rate": { "09:05": 0.1, "09:12": 0.1, "09:20": 0.2 }
+    }
+  },
+  "logs": [
+    { "at": "09:13", "service": "search-api", "level": "error", "text": "search_v3 ranker returned empty candidate set; falling back", "count": 4820 },
+    { "at": "09:14", "service": "search-api", "level": "error", "text": "query planner timeout after 3000ms", "count": 1960 }
+  ],
+  "traces": {
+    "available_after_minutes": 10,
+    "spans": [
+      { "service": "search-api", "op": "GET /search", "p99_ms": 505, "downstream": "catalog-svc" }
+    ]
+  },
+  "deploys": [
+    {
+      "id": "5100",
+      "service": "search-api",
+      "at": "08:55",
+      "author": "@dev-sam",
+      "diff_summary": "update README and runbook links; no runtime change",
+      "files": ["README.md", "docs/runbook.md"]
+    }
+  ],
+  "code": {
+    "search-api": {
+      "owners": ["@search-team"],
+      "recent_pr": "https://github.com/acme/search-api/pull/1204",
+      "blame": "ranker_v3.rb untouched since 2024-10-18; the ramp is config, not code"
+    }
+  },
+  "flags": [
+    { "key": "search_v3", "service": "search-api", "at": "09:12", "from": 10, "to": 100, "actor": "@dev-rey" },
+    { "key": "catalog_cache", "service": "catalog-svc", "at": "07:30", "from": 100, "to": 100, "actor": "@dev-rey" }
+  ],
+  "history": [
+    { "at": "2025-03-14", "title": "search latency after a ranker ramp", "resolution": "held the ramp at 25% and fixed the candidate set" }
+  ]
+}

@@ -36,10 +36,17 @@ class BrokeredResult:
     cached: bool
 
 
-def _hash_args(name: str, args: dict[str, Any], provider: str) -> str:
-    """Cache/dedupe key. ``provider`` is part of it deliberately."""
+def _hash_args(
+    name: str, args: dict[str, Any], provider: str, incident_id: uuid.UUID
+) -> str:
+    """Cache/dedupe key."""
     payload = json.dumps(
-        {"name": name, "args": args, "provider": provider},
+        {
+            "name": name,
+            "args": args,
+            "provider": provider,
+            "incident": str(incident_id),
+        },
         sort_keys=True,
         default=str,
     )
@@ -159,7 +166,9 @@ class ToolBroker:
             )
 
         redacted = _redact_args(args)
-        args_hash = _hash_args(name, redacted, self.provider_fingerprint)
+        args_hash = _hash_args(
+            name, redacted, self.provider_fingerprint, self._incident_id
+        )
         
         cached = await self._cache_get(args_hash)
         if cached is not None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flare.agents.read.base import Probe, ReadAgent
+from flare.agents.read.base import Probe, ReadAgent, plan_service
 
 
 class TelemetryAgent(ReadAgent):
@@ -10,7 +10,7 @@ class TelemetryAgent(ReadAgent):
     system = "metrics"
 
     async def gather(self, plan: dict[str, Any]) -> list[Probe]:
-        service = plan.get("service", "checkout-api")
+        service = plan_service(plan)
         p99 = await self._broker.call("metrics.query", service=service, metric="p99_ms")
         errors = await self._broker.call(
             "metrics.query", service=service, metric="error_rate"

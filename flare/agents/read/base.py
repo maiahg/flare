@@ -21,6 +21,27 @@ absent, or normal from a read that failed — say what you saw, and nothing abou
 what you could not see. Return findings matching the schema."""
 
 
+DEFAULT_SERVICE = "checkout-api"
+DEFAULT_SUSPECT_SERVICE = "payments-svc"
+
+def has_content(data: dict[str, Any]) -> bool:
+    for value in data.values():
+        if isinstance(value, (list, dict, tuple, set)) and value:
+            return True
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return True
+    return False
+
+
+def plan_service(plan: dict[str, Any]) -> str:
+    return str(plan.get("service") or DEFAULT_SERVICE)
+
+
+def plan_suspect_service(plan: dict[str, Any]) -> str:
+    return str(
+        plan.get("suspect_service") or plan.get("service") or DEFAULT_SUSPECT_SERVICE
+    )
+
 @dataclass(frozen=True)
 class Probe:
     """One broker call the agent made, plus the human-readable query it ran."""
@@ -57,7 +78,11 @@ class ReadAgent:
             for p in probes
             for limit in p.brokered.result.limitations
         ]
-        usable = [p for p in probes if p.brokered.result.data]
+        usable = [
+            p
+            for p in probes
+            if not p.brokered.result.degraded and p.brokered.result.data
+        ]
         if not usable:
             return []
 
@@ -98,15 +123,21 @@ class ReadAgent:
 
         if not drafts:
             for p in usable:
+                payload = json.dumps(p.brokered.result.data, default=str)
+                found = has_content(p.brokered.result.data)
                 drafts.append(
                     EvidenceDraft(
                         system=self.system,
-                        title=f"{self.system}: {p.query}",
-                        body=json.dumps(p.brokered.result.data, default=str)[:480],
+                        title=(
+                            f"{self.system}: {p.query}"
+                            if found
+                            else f"{self.system}: {p.query} — no results"
+                        ),
+                        body=payload[:480] if found else f"no results. {payload}"[:480],
                         query=p.query,
                         result_ref=dict(p.brokered.result.data),
                         tool_call_id=p.brokered.tool_call_id,
-                        confidence=0.6,
+                        confidence=0.6 if found else 0.35,
                         created_by=self.agent_name,
                     )
                 )

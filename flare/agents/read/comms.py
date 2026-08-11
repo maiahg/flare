@@ -50,7 +50,7 @@ Rules:
 
 
 class UnknownAudienceError(ValueError):
-    """Raised for an audience outside the §3.2 vocabulary."""
+    """Raised for an audience outside the vocabulary."""
 
 
 @dataclass

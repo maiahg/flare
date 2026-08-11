@@ -309,3 +309,59 @@ class RunAccepted(BaseModel):
     incident_id: uuid.UUID
     target: str | None = None
     focus: str | None = None
+
+
+class AgentTokenUsage(BaseModel):
+    """One agent's share of an incident's tokens."""
+
+    agent_name: str
+    calls: int
+    tokens_in: int
+    tokens_out: int
+
+
+class RunTokenUsage(BaseModel):
+    """Per-run usage — the row the run detail shows."""
+
+    run_id: uuid.UUID
+    run_type: str | None = None
+    status: str | None = None
+    created_at: datetime
+    tokens_in: int
+    tokens_out: int
+
+    @property
+    def total(self) -> int:
+        return self.tokens_in + self.tokens_out
+
+
+class IncidentUsage(BaseModel):
+    """Token spend for an incident against its budget"""
+
+    incident_id: uuid.UUID
+    tokens_in: int
+    tokens_out: int
+    total: int
+    runs: int
+    budget: int
+    remaining: int
+    near_cap: bool
+    exhausted: bool
+    by_run: list[RunTokenUsage] = Field(default_factory=list)
+    by_agent: list[AgentTokenUsage] = Field(default_factory=list)
+
+
+class ErasureRequest(WriteModel):
+    """``DELETE /incidents/{id}`` body — deletion needs a stated reason."""
+
+    detail: str
+    reason: str = "request"
+
+
+class ErasureReceiptRead(BaseModel):
+    """Proof of what a deletion removed."""
+
+    incident_id: uuid.UUID
+    tombstone_id: uuid.UUID
+    row_counts: dict[str, int] = Field(default_factory=dict)
+    export_ref: str | None = None

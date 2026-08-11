@@ -11,6 +11,7 @@ export const incidentKeys = {
   run: (id: string, runId: string) => ["incident", id, "run", runId] as const,
   evidence: (id: string) => ["incident", id, "evidence"] as const,
   hypotheses: (id: string) => ["incident", id, "hypotheses"] as const,
+  usage: (id: string) => ["incident", id, "usage"] as const,
 };
 
 export function useIncidents() {
@@ -103,6 +104,20 @@ export function useHypotheses(id: string) {
         { params: { path: { incident_id: id } } },
       );
       if (error) throw new Error("failed to load hypotheses");
+      return data;
+    },
+  });
+}
+
+export function useUsage(id: string) {
+  return useQuery({
+    queryKey: incidentKeys.usage(id),
+    queryFn: async () => {
+      const { data, error } = await api.GET(
+        "/api/v1/incidents/{incident_id}/usage",
+        { params: { path: { incident_id: id } } },
+      );
+      if (error) throw new Error("failed to load token usage");
       return data;
     },
   });

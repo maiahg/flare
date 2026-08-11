@@ -129,6 +129,11 @@ class RunRecorder:
                 if step.provider_request_id:
                     self._last_provider_request_id = step.provider_request_id
 
+    @property
+    def tokens_used(self) -> int:
+        return self._total_in + self._total_out
+
+
     async def save_plan(self, plan: dict[str, Any]) -> None:
         """Persist the run's plan so the dashboard can show why these agents ran."""
         assert self.run_id is not None

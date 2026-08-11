@@ -91,7 +91,6 @@ class PostmortemMemory:
     timeline: list[dict[str, Any]] = field(default_factory=list)
     decisions: list[tuple[str, MemoryRef]] = field(default_factory=list)
     action_items: list[dict[str, Any]] = field(default_factory=list)
-    #: Stated gaps carried from the runs that produced this memory (§10.3).
     limitations: list[str] = field(default_factory=list)
 
 

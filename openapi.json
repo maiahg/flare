@@ -365,6 +365,74 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Erase",
+        "description": "Delete an incident and everything cascading from it (\u00a711.11).\n\nRequires the actor header like every other write, plus a reason in the\nbody. The response is the receipt \u2014 row counts by table \u2014 and a\n``data_erasures`` tombstone outlives the data as the only remaining proof.\n\nReturns 200 with the receipt rather than 204: a deletion the caller cannot\naudit is a deletion they have to take on faith.",
+        "operationId": "erase_api_v1_incidents__incident_id__delete",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErasureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasureReceiptRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/incidents/{incident_id}/summary": {
@@ -1376,6 +1444,96 @@
                     "$ref": "#/components/schemas/RevisionRead"
                   },
                   "title": "Response List Revisions Api V1 Incidents  Incident Id  Revisions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/usage": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Get Incident Usage",
+        "description": "Token spend for an incident, per run and per agent, against its budget.\n\nNo USD anywhere: the provider reports token usage only (\u00a73.2), and inventing\na price from a public rate card would be a number people plan with and we\ncannot stand behind.",
+        "operationId": "get_incident_usage_api_v1_incidents__incident_id__usage_get",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentUsage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{incident_id}/export": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Export",
+        "description": "Everything the product holds about this incident, as one JSON document.\n\nServes both the postmortem-record use and the \"show me my data\" use on\npurpose: an export that shows less than the dashboard would be a lie by\nomission, and maintaining two extractors guarantees they diverge.",
+        "operationId": "export_api_v1_incidents__incident_id__export_get",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Api V1 Incidents  Incident Id  Export Get"
                 }
               }
             }
@@ -2620,6 +2778,35 @@
         ],
         "title": "ActionItemRead"
       },
+      "AgentTokenUsage": {
+        "properties": {
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_name",
+          "calls",
+          "tokens_in",
+          "tokens_out"
+        ],
+        "title": "AgentTokenUsage",
+        "description": "One agent's share of an incident's tokens."
+      },
       "AgentTraceRead": {
         "properties": {
           "id": {
@@ -3318,6 +3505,65 @@
           "updated_at"
         ],
         "title": "DecisionRead"
+      },
+      "ErasureReceiptRead": {
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Incident Id"
+          },
+          "tombstone_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tombstone Id"
+          },
+          "row_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Row Counts"
+          },
+          "export_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id",
+          "tombstone_id"
+        ],
+        "title": "ErasureReceiptRead",
+        "description": "Proof of what a deletion removed."
+      },
+      "ErasureRequest": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": "request"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErasureRequest",
+        "description": "``DELETE /incidents/{id}`` body \u2014 deletion needs a stated reason.\n\nA free-text reason is not bureaucracy: this is the only endpoint in the\nproduct that destroys memory, and the tombstone it writes is the only\nrecord that will remain."
       },
       "EvidencePatch": {
         "properties": {
@@ -4339,6 +4585,75 @@
         "title": "IncidentSummaryCounts",
         "description": "Per-entity counts shown on the overview header."
       },
+      "IncidentUsage": {
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Incident Id"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "budget": {
+            "type": "integer",
+            "title": "Budget"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          },
+          "near_cap": {
+            "type": "boolean",
+            "title": "Near Cap"
+          },
+          "exhausted": {
+            "type": "boolean",
+            "title": "Exhausted"
+          },
+          "by_run": {
+            "items": {
+              "$ref": "#/components/schemas/RunTokenUsage"
+            },
+            "type": "array",
+            "title": "By Run"
+          },
+          "by_agent": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTokenUsage"
+            },
+            "type": "array",
+            "title": "By Agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id",
+          "tokens_in",
+          "tokens_out",
+          "total",
+          "runs",
+          "budget",
+          "remaining",
+          "near_cap",
+          "exhausted"
+        ],
+        "title": "IncidentUsage",
+        "description": "Token spend for an incident against its budget (no USD \u2014 see \u00a73.2).\n\n``near_cap`` mirrors what the provider reports for the project-wide budget,\nso the dashboard can render an approaching per-incident ceiling and an\napproaching provider ceiling the same way."
+      },
       "InvestigateRequest": {
         "properties": {
           "target": {
@@ -5301,6 +5616,59 @@
           "created_at"
         ],
         "title": "RunRead"
+      },
+      "RunTokenUsage": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "run_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "tokens_in": {
+            "type": "integer",
+            "title": "Tokens In"
+          },
+          "tokens_out": {
+            "type": "integer",
+            "title": "Tokens Out"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "created_at",
+          "tokens_in",
+          "tokens_out"
+        ],
+        "title": "RunTokenUsage",
+        "description": "Per-run usage \u2014 the row the \u00a76.4 run detail shows."
       },
       "SummaryRead": {
         "properties": {

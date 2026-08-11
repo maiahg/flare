@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from flare.adaptive.novelty import NoveltyVerdict, signal_text
@@ -52,6 +53,7 @@ class InvestigationPlan:
     checking: list[str] = field(default_factory=list)
     signals: list[str] = field(default_factory=list)
     deploy_id: str | None = None
+    service: str | None = None
     suspect_service: str | None = None
 
     def as_dict(self) -> dict[str, object]:
@@ -62,6 +64,7 @@ class InvestigationPlan:
             "checking": self.checking,
             "signals": self.signals,
             "deploy_id": self.deploy_id,
+            "service": self.service,
             "suspect_service": self.suspect_service,
         }
 
@@ -83,6 +86,18 @@ def _hint(verdicts: list[NoveltyVerdict], signal_type: str) -> str | None:
     return None
 
 
+_DEPLOY_PREFIX = re.compile(r"^(?:deployment|deploy)?[-#\s]*", re.IGNORECASE)
+
+
+def deploy_id_hint(verdicts: list[NoveltyVerdict]) -> str | None:
+    """The deploy id a run should look up, extracted from the signal text."""
+    raw = _hint(verdicts, "deploy")
+    if raw is None:
+        return None
+    stripped = _DEPLOY_PREFIX.sub("", raw.strip()).strip()
+    return stripped or None
+
+
 class InvestigationPlannerAgent:
     def __init__(self, llm: LLMClient, *, model: str | None = None) -> None:
         self._llm = llm
@@ -100,7 +115,7 @@ class InvestigationPlannerAgent:
             focus="",
             checking=list(candidates),
             signals=signals,
-            deploy_id=_hint(novel, "deploy"),
+            deploy_id=deploy_id_hint(novel),
             suspect_service=_hint(novel, "service"),
         )
         if len(candidates) <= 1:

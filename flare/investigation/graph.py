@@ -15,6 +15,7 @@ from flare.agents.critic import CriticAgent
 from flare.agents.hypothesis import HypothesisAgent
 from flare.agents.mitigation import MitigationAgent
 from flare.agents.read import CodeAgent, DeployAgent, ImpactAgent, TelemetryAgent
+from flare.agents.read.base import DEFAULT_SERVICE, DEFAULT_SUSPECT_SERVICE
 from flare.agents.summarizer import SummarizerAgent
 from flare.approvals import SUBJECT_MITIGATION, create_approval
 from flare.config import LLMModelSettings, MitigationSettings, RunBudgetSettings
@@ -23,6 +24,7 @@ from flare.investigation.commit import commit_memory, commit_mitigation
 from flare.investigation.recorder import RunRecorder
 from flare.investigation.state import RunState, budget_exceeded
 from flare.llm import LLMClient
+from flare.llm.errors import RateLimitedError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
@@ -86,9 +88,11 @@ def build_investigation_graph(
             return {"revision_count": 0}
         trigger = state.get("trigger", {})
         plan = {
-            "service": "checkout-api",
+            "service": trigger.get("service") or DEFAULT_SERVICE,
             "deploy_id": trigger.get("deploy_id"),
-            "suspect_service": "payments-svc",
+            "suspect_service": (
+                trigger.get("suspect_service") or DEFAULT_SUSPECT_SERVICE
+            ),
             "checking": ["metrics", "deploys", "code", "impact"],
         }
         return {"plan": plan, "revision_count": 0}
@@ -103,7 +107,14 @@ def build_investigation_graph(
         async with deps.semaphore:
             async with deps.recorder.agent_step(name, seq) as step:
                 agent = agent_cls(deps.llm, step.broker, model=deps.models.default)
-                drafts = await agent.run(plan=state["plan"])
+                try:
+                    drafts = await agent.run(plan=state["plan"])
+                except RateLimitedError as exc:
+                    drafts = []
+                    agent.limitations = [
+                        f"{name}: LLM rate limited, findings not summarized ({exc})"
+                    ]
+                    step.error = "rate limited"
                 step.output = {
                     "evidence": len(drafts),
                     "limitations": agent.limitations,
@@ -128,7 +139,10 @@ def build_investigation_graph(
         tool_calls = await deps.recorder.count_tool_calls()
         elapsed = time.monotonic() - deps.budget_started
         limit = budget_exceeded(
-            elapsed_s=elapsed, tool_calls=tool_calls, budget=deps.budget
+            elapsed_s=elapsed,
+            tool_calls=tool_calls,
+            budget=deps.budget,
+            tokens=deps.recorder.tokens_used,
         )
         out: RunState = {"tool_call_count": tool_calls}
         if limit is not None:
@@ -144,11 +158,22 @@ def build_investigation_graph(
         )
         async with deps.recorder.agent_step("HypothesisAgent", 5) as step:
             agent = HypothesisAgent(deps.llm, model=deps.models.hypothesis)
-            hyps = await agent.run(
-                evidence=state.get("evidence", []),
-                critique=critique,
-                previous=state.get("hypotheses", []),
-            )
+            try:
+                hyps = await agent.run(
+                    evidence=state.get("evidence", []),
+                    critique=critique,
+                    previous=state.get("hypotheses", []),
+                )
+            except RateLimitedError as exc:
+                hyps = []
+                step.error = "rate limited"
+                step.output = {"hypotheses": 0}
+                step.record_usage(agent.usage, fallback_model=deps.models.hypothesis)
+                return {
+                    "hypotheses": [],
+                    "truncated": True,
+                    "limitations": [f"hypothesis ranking skipped: rate limited ({exc})"],
+                }
             step.output = {"hypotheses": len(hyps)}
             step.record_usage(agent.usage, fallback_model=deps.models.hypothesis)
         return {"hypotheses": hyps}

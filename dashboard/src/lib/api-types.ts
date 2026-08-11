@@ -92,7 +92,7 @@ export interface paths {
         put?: never;
         /**
          * Slack Interactions
-         * @description Interactivity endpoint: buttons, menus and modals steer the incident (§5).
+         * @description Interactivity endpoint: buttons, menus and modals steer the incident.
          *
          *     The work happens inline — these are single-row steering writes, well inside
          *     Slack's 3s budget — and the confirmation goes back through ``response_url``.
@@ -140,7 +140,7 @@ export interface paths {
         put?: never;
         /**
          * Create Incident
-         * @description Open an incident (§4.2).
+         * @description Open an incident.
          */
         post: operations["create_incident_api_v1_incidents_post"];
         delete?: never;
@@ -163,7 +163,18 @@ export interface paths {
         get: operations["get_incident_detail_api_v1_incidents__incident_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Erase
+         * @description Delete an incident and everything cascading from it.
+         *
+         *     Requires the actor header like every other write, plus a reason in the
+         *     body. The response is the receipt — row counts by table — and a
+         *     ``data_erasures`` tombstone outlives the data as the only remaining proof.
+         *
+         *     Returns 200 with the receipt rather than 204: a deletion the caller cannot
+         *     audit is a deletion they have to take on faith.
+         */
+        delete: operations["erase_api_v1_incidents__incident_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -427,7 +438,7 @@ export interface paths {
         };
         /**
          * List Triggers
-         * @description Trigger decisions for an incident, newest first (§7.4).
+         * @description Trigger decisions for an incident, newest first.
          *
          *     Includes ``skip`` decisions on purpose: the suppressed ones are exactly
          *     what you want to audit when the bot felt too quiet or too noisy.
@@ -453,7 +464,7 @@ export interface paths {
          * @description Approval requests, newest first.
          *
          *     Pending ones are the actionable list: each represents a branch of an
-         *     investigation waiting on a human (§7.6).
+         *     investigation waiting on a human.
          */
         get: operations["list_incident_approvals_api_v1_incidents__incident_id__approvals_get"];
         put?: never;
@@ -484,6 +495,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/incidents/{incident_id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Incident Usage
+         * @description Token spend for an incident, per run and per agent, against its budget.
+         *
+         *     No USD anywhere: the provider reports token usage only, and inventing
+         *     a price from a public rate card would be a number people plan with and we
+         *     cannot stand behind.
+         */
+        get: operations["get_incident_usage_api_v1_incidents__incident_id__usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/incidents/{incident_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export
+         * @description Everything the product holds about this incident, as one JSON document.
+         *
+         *     Serves both the postmortem-record use and the "show me my data" use on
+         *     purpose: an export that shows less than the dashboard would be a lie by
+         *     omission, and maintaining two extractors guarantees they diverge.
+         */
+        get: operations["export_api_v1_incidents__incident_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/incidents/{incident_id}/mode": {
         parameters: {
             query?: never;
@@ -495,7 +554,7 @@ export interface paths {
         put?: never;
         /**
          * Set Mode
-         * @description Set the behavior mode: quiet | scribe | assist | active (§9.5).
+         * @description Set the behavior mode: quiet | scribe | assist | active.
          */
         post: operations["set_mode_api_v1_incidents__incident_id__mode_post"];
         delete?: never;
@@ -515,7 +574,7 @@ export interface paths {
         put?: never;
         /**
          * Investigate
-         * @description Queue a manual, targeted, read-only run (§4.3).
+         * @description Queue a manual, targeted, read-only run.
          *
          *     202, not 200: the run executes on the worker. Returning only once it
          *     finished would hold the request open for the whole investigation budget.
@@ -562,7 +621,7 @@ export interface paths {
         head?: never;
         /**
          * Patch Hypothesis
-         * @description Confirm or reject a hypothesis (§11.9: a rejection is permanent).
+         * @description Confirm or reject a hypothesis.
          */
         patch: operations["patch_hypothesis_api_v1_incidents__incident_id__hypotheses__hypothesis_id__patch"];
         trace?: never;
@@ -582,7 +641,7 @@ export interface paths {
         head?: never;
         /**
          * Patch Evidence
-         * @description Mark evidence stale — the only mutation an observation allows (§3.3).
+         * @description Mark evidence stale — the only mutation an observation allows.
          */
         patch: operations["patch_evidence_api_v1_incidents__incident_id__evidence__evidence_id__patch"];
         trace?: never;
@@ -635,11 +694,11 @@ export interface paths {
         put?: never;
         /**
          * Generate Comms
-         * @description Write the next version of one audience's draft (§5).
+         * @description Write the next version of one audience's draft.
          *
          *     Drafting is not sending, and this endpoint is not a send button: it appends
          *     a ``comms_drafts`` row. Nothing in the comms package can reach Slack, email
-         *     or a status page (§11.2).
+         *     or a status page.
          */
         post: operations["generate_comms_api_v1_incidents__incident_id__comms_generate_post"];
         delete?: never;
@@ -679,7 +738,7 @@ export interface paths {
         put?: never;
         /**
          * Approve Comms
-         * @description Approve a draft. Approval marks it approved; it never sends (§11.2).
+         * @description Approve a draft. Approval marks it approved; it never sends.
          */
         post: operations["approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post"];
         delete?: never;
@@ -699,12 +758,12 @@ export interface paths {
         put?: never;
         /**
          * Decide
-         * @description Approve or reject a gated recommendation (§4.3 / §7.6).
+         * @description Approve or reject a gated recommendation.
          *
          *     Approval **records intent only**. It flips the approval row and the
          *     mitigation's status and releases the paused branch so it can finish
          *     recording the outcome — it never applies the mitigation, and there is no
-         *     adapter it could apply one with (§11.1).
+         *     adapter it could apply one with.
          */
         post: operations["decide_api_v1_incidents__incident_id__approvals__approval_id__post"];
         delete?: never;
@@ -724,7 +783,7 @@ export interface paths {
         put?: never;
         /**
          * Submit Correction
-         * @description Record a human correction; Scribe reconciles what it invalidates (§4.3).
+         * @description Record a human correction; Scribe reconciles what it invalidates.
          */
         post: operations["submit_correction_api_v1_incidents__incident_id__corrections_post"];
         delete?: never;
@@ -838,6 +897,20 @@ export interface components {
             /** Due At */
             due_at?: string | null;
         };
+        /**
+         * AgentTokenUsage
+         * @description One agent's share of an incident's tokens.
+         */
+        AgentTokenUsage: {
+            /** Agent Name */
+            agent_name: string;
+            /** Calls */
+            calls: number;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+        };
         /** AgentTraceRead */
         AgentTraceRead: {
             /**
@@ -890,7 +963,7 @@ export interface components {
         };
         /**
          * ApprovalDecision
-         * @description ``{decision: approved|rejected, note?}`` — §4.3 ``POST /approvals/{id}``.
+         * @description ``{decision: approved|rejected, note?}`` — ``POST /approvals/{id}``.
          */
         ApprovalDecision: {
             /** Decision */
@@ -1070,8 +1143,47 @@ export interface components {
             rationale?: string | null;
         };
         /**
+         * ErasureReceiptRead
+         * @description Proof of what a deletion removed.
+         */
+        ErasureReceiptRead: {
+            /**
+             * Incident Id
+             * Format: uuid
+             */
+            incident_id: string;
+            /**
+             * Tombstone Id
+             * Format: uuid
+             */
+            tombstone_id: string;
+            /** Row Counts */
+            row_counts?: {
+                [key: string]: number;
+            };
+            /** Export Ref */
+            export_ref?: string | null;
+        };
+        /**
+         * ErasureRequest
+         * @description ``DELETE /incidents/{id}`` body — deletion needs a stated reason.
+         *
+         *     A free-text reason is not bureaucracy: this is the only endpoint in the
+         *     product that destroys memory, and the tombstone it writes is the only
+         *     record that will remain.
+         */
+        ErasureRequest: {
+            /** Detail */
+            detail: string;
+            /**
+             * Reason
+             * @default request
+             */
+            reason: string;
+        };
+        /**
          * EvidencePatch
-         * @description Evidence accepts exactly one edit: marking it stale (§3.3).
+         * @description Evidence accepts exactly one edit: marking it stale.
          */
         EvidencePatch: {
             /** Status */
@@ -1260,7 +1372,7 @@ export interface components {
         };
         /**
          * IncidentDetail
-         * @description Overview payload: the incident, its current summary, and counts (§4.2).
+         * @description Overview payload: the incident, its current summary, and counts.
          */
         IncidentDetail: {
             /**
@@ -1410,6 +1522,41 @@ export interface components {
              * @default 0
              */
             mitigation_options: number;
+        };
+        /**
+         * IncidentUsage
+         * @description Token spend for an incident against its budget.
+         *
+         *     ``near_cap`` mirrors what the provider reports for the project-wide budget,
+         *     so the dashboard can render an approaching per-incident ceiling and an
+         *     approaching provider ceiling the same way.
+         */
+        IncidentUsage: {
+            /**
+             * Incident Id
+             * Format: uuid
+             */
+            incident_id: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
+            /** Total */
+            total: number;
+            /** Runs */
+            runs: number;
+            /** Budget */
+            budget: number;
+            /** Remaining */
+            remaining: number;
+            /** Near Cap */
+            near_cap: boolean;
+            /** Exhausted */
+            exhausted: boolean;
+            /** By Run */
+            by_run?: components["schemas"]["RunTokenUsage"][];
+            /** By Agent */
+            by_agent?: components["schemas"]["AgentTokenUsage"][];
         };
         /** InvestigateRequest */
         InvestigateRequest: {
@@ -1632,7 +1779,7 @@ export interface components {
         };
         /**
          * RunDetail
-         * @description A run plus its agent traces and the tool calls beneath them (§4.2).
+         * @description A run plus its agent traces and the tool calls beneath them.
          */
         RunDetail: {
             /**
@@ -1726,6 +1873,30 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * RunTokenUsage
+         * @description Per-run usage — the row the run detail shows.
+         */
+        RunTokenUsage: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Run Type */
+            run_type?: string | null;
+            /** Status */
+            status?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Tokens In */
+            tokens_in: number;
+            /** Tokens Out */
+            tokens_out: number;
         };
         /** SummaryRead */
         SummaryRead: {
@@ -2138,6 +2309,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IncidentDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    erase_api_v1_incidents__incident_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErasureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasureReceiptRead"];
                 };
             };
             /** @description Validation Error */
@@ -2708,6 +2916,70 @@ export interface operations {
             };
         };
     };
+    get_incident_usage_api_v1_incidents__incident_id__usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentUsage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_api_v1_incidents__incident_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_mode_api_v1_incidents__incident_id__mode_post: {
         parameters: {
             query?: never;
@@ -3200,7 +3472,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Live incident events (§4.4). */
+            /** @description Live incident events. */
             200: {
                 headers: {
                     [name: string]: unknown;

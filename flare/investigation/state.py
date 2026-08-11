@@ -31,11 +31,17 @@ class RunState(TypedDict, total=False):
 
 
 def budget_exceeded(
-    *, elapsed_s: float, tool_calls: int, budget: RunBudgetSettings
+    *,
+    elapsed_s: float,
+    tool_calls: int,
+    budget: RunBudgetSettings,
+    tokens: int = 0,
 ) -> str | None:
     """Return a limitation string if any budget dimension is exceeded, else None."""
     if tool_calls > budget.max_tool_calls:
         return f"tool-call budget exceeded ({tool_calls} > {budget.max_tool_calls})"
+    if budget.max_tokens and tokens > budget.max_tokens:
+        return f"token budget exceeded ({tokens:,} > {budget.max_tokens:,})"
     if elapsed_s > budget.max_wall_clock_s:
         return f"wall-clock budget exceeded ({elapsed_s:.0f}s > {budget.max_wall_clock_s}s)"
     return None

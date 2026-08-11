@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from flare.agents.drafts import CriticVerdict, EvidenceDraft, HypothesisDraft
 from flare.agents.schemas import CriticOutput
 from flare.llm import LLMClient, LLMUsage
+from flare.llm.errors import RateLimitedError
 
 #: A hypothesis this likely needs more than one piece of evidence behind it.
 _OVERCONFIDENCE_THRESHOLD = 0.95
@@ -17,7 +18,7 @@ hypothesis contradicted by the evidence. Return output matching the schema:
 passed=false with specific reasons, or passed=true."""
 
 
-def _deterministic_reasons(
+def deterministic_reasons(
     evidence: list[EvidenceDraft], hypotheses: list[HypothesisDraft]
 ) -> tuple[list[str], dict[str, float]]:
     reasons: list[str] = []
@@ -59,7 +60,7 @@ class CriticAgent:
         evidence: list[EvidenceDraft],
         hypotheses: list[HypothesisDraft],
     ) -> CriticVerdict:
-        det_reasons, downgrade = _deterministic_reasons(evidence, hypotheses)
+        det_reasons, downgrade = deterministic_reasons(evidence, hypotheses)
 
         ev = "\n".join(f"- ({e.system}, conf {e.confidence:.2f}) {e.title}" for e in evidence)
         hy = "\n".join(
@@ -67,13 +68,20 @@ class CriticAgent:
             f"{len(h.supports)} support / {len(h.contradicts)} contradict)"
             for h in hypotheses
         )
-        result = await self._llm.structured(
-            schema=CriticOutput,
-            system=_SYSTEM,
-            user=f"<staged>\nEVIDENCE:\n{ev}\n\nHYPOTHESES:\n{hy}\n</staged>",
-            model=self._model,
-            trace_name="critic.review",
-        )
+        try:
+            result = await self._llm.structured(
+                schema=CriticOutput,
+                system=_SYSTEM,
+                user=f"<staged>\nEVIDENCE:\n{ev}\n\nHYPOTHESES:\n{hy}\n</staged>",
+                model=self._model,
+                trace_name="critic.review",
+            )
+        except RateLimitedError as exc:
+            return CriticVerdict(
+                passed=not det_reasons,
+                reasons=[*det_reasons, f"model review skipped: rate limited ({exc})"],
+                downgrade=downgrade,
+            )
         self.usage.add(result)
 
         reasons = det_reasons + list(result.value.reasons)

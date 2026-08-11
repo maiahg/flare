@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react";
 import { EvidenceList, HypothesisList } from "@/components/ClaimLists";
 import { IncidentOverview } from "@/components/IncidentOverview";
 import { RunDetailView, RunList } from "@/components/RunTrace";
+import { TokenUsagePanel } from "@/components/TokenUsage";
 import { Timeline } from "@/components/Timeline";
 import {
   useEvidence,
@@ -13,10 +14,17 @@ import {
   useRun,
   useRuns,
   useTimeline,
+  useUsage,
 } from "@/lib/hooks";
 import { useIncidentStream } from "@/lib/useIncidentStream";
 
-type Tab = "overview" | "timeline" | "runs" | "evidence" | "hypotheses";
+type Tab =
+  | "overview"
+  | "timeline"
+  | "runs"
+  | "evidence"
+  | "hypotheses"
+  | "usage";
 
 const TABS: Array<[Tab, string]> = [
   ["overview", "Overview"],
@@ -24,6 +32,7 @@ const TABS: Array<[Tab, string]> = [
   ["runs", "Runs"],
   ["evidence", "Evidence"],
   ["hypotheses", "Hypotheses"],
+  ["usage", "Tokens"],
 ];
 
 export default function IncidentPage({
@@ -44,6 +53,7 @@ export default function IncidentPage({
   const run = useRun(id, selectedRun);
   const evidence = useEvidence(id);
   const hypotheses = useHypotheses(id);
+  const usage = useUsage(id);
 
   // Default to the most recent run once the list loads.
   useEffect(() => {
@@ -98,6 +108,14 @@ export default function IncidentPage({
       {tab === "hypotheses" ? (
         <HypothesisList hypotheses={hypotheses.data ?? []} />
       ) : null}
+
+      {tab === "usage" ? (
+        <>
+          {usage.isLoading ? <p>Loading usage…</p> : null}
+          {usage.data ? <TokenUsagePanel usage={usage.data} /> : null}
+        </>
+      ) : null}
+      
     </main>
   );
 }

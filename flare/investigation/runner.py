@@ -6,6 +6,7 @@ import time
 import uuid
 from typing import Any
 
+from flare.budgets import check_incident_budget
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.investigation.graph import (
@@ -49,6 +50,18 @@ async def start_initial_run(
     )
     run_id = await recorder.start()
 
+    verdict = await check_incident_budget(incident_id)
+    if not verdict.allowed:
+        _logger.warning(
+            "incident %s is over its token budget; refusing the initial run",
+            incident_id,
+            extra={"used": verdict.used, "limit": verdict.limit},
+        )
+        await recorder.finish(
+            status="cancelled", limitations=[verdict.limitation()], summary=None
+        )
+        return run_id
+        
     if not dashboard_url:
         base = str(settings.app_base_url).rstrip("/")
         dashboard_url = f"{base}/incidents/{incident_id}"

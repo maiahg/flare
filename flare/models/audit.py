@@ -94,3 +94,20 @@ class Approval(UUIDAuditMixin, Base):
         TIMESTAMP(timezone=True), nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class DataErasure(UUIDAuditMixin, Base):
+    __tablename__ = "data_erasures"
+
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True
+    )
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
+    incident_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    row_counts: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    export_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
