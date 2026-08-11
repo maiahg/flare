@@ -4,13 +4,18 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import select
 
 from flare.adaptive import supersede
 from flare.adaptive.novelty import NoveltyVerdict
-from flare.agents.planner import InvestigationPlannerAgent
+from flare.agents.planner import (
+    AGENT_NAMES,
+    InvestigationPlan,
+    InvestigationPlannerAgent,
+)
 from flare.agents.schemas import ExtractedSignal
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
@@ -76,6 +81,8 @@ async def start_adaptive_run(
     poster: InvestigationPoster | None = None,
     approval_poster: ApprovalPoster | None = None,
     dashboard_url: str = "",
+    run_type: str = "adaptive",
+    agents: Sequence[str] | None = None,
 ) -> uuid.UUID:
     """Plan and execute a targeted adaptive run; return the run id."""
     settings = get_settings()
@@ -87,7 +94,7 @@ async def start_adaptive_run(
     recorder = RunRecorder(
         sessionmaker,
         incident_id=incident_id,
-        run_type="adaptive",
+        run_type="run_type",
         trigger=trigger,
         created_by=created_by,
         scenario=scenario,
@@ -103,11 +110,18 @@ async def start_adaptive_run(
     llm = get_llm_client()
 
     # ---- plan the targeted subgraph (its own trace, like any other agent)
-    async with recorder.agent_step("InvestigationPlannerAgent", 0) as step:
-        planner = InvestigationPlannerAgent(llm, model=settings.llm.models.planner)
-        plan = await planner.run(verdicts=verdicts)
-        step.output = {"agents": plan.agents, "focus": plan.focus}
-        step.record_usage(planner.usage, fallback_model=settings.llm.models.planner)
+    if agents is not None:
+        plan = InvestigationPlan(
+            agents=[name for name in agents if name in AGENT_NAMES],
+            focus=str(trigger.get("focus") or "scheduled refresh"),
+        )
+        plan.checking = list(plan.agents)
+    else:
+        async with recorder.agent_step("InvestigationPlannerAgent", 0) as step:
+            planner = InvestigationPlannerAgent(llm, model=settings.llm.models.planner)
+            plan = await planner.run(verdicts=verdicts)
+            step.output = {"agents": plan.agents, "focus": plan.focus}
+            step.record_usage(planner.usage, fallback_model=settings.llm.models.planner)
     await recorder.save_plan(dict(plan.as_dict()))
 
     async def cancelled() -> bool:

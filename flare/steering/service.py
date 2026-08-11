@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -9,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from flare.active import ensure_active_loop, resolve_interval, stop_active_loop
 from flare.agents.reconciler import CorrectionCandidate, CorrectionReconciler
 from flare.events.outbox import commit_and_publish
 from flare.llm import LLMClient
@@ -44,6 +46,17 @@ HUMAN_CONFIDENCE = 1.0
 #: How many existing claims a correction is reconciled against.
 CORRECTION_CANDIDATES = 25
 
+ACTIVE_MODE = "active"
+
+_logger = logging.getLogger("flare.steering")
+
+
+async def _quiet(awaitable: Awaitable[Any]) -> None:
+    """Run a post-commit side effect without letting it undo the write."""
+    try:
+        await awaitable
+    except Exception: 
+        _logger.warning("active-mode scheduling failed", exc_info=True)
 
 @dataclass
 class CorrectionOutcome:
@@ -186,7 +199,19 @@ class SteeringService:
             after={"mode": mode},
             action=f"set mode to {mode}",
         )
+        await self._schedule_active_mode(incident, mode)
         return incident
+
+    async def _schedule_active_mode(self, incident: Incident, mode: str) -> None:
+        """Start or stop the active-mode refresh loop after the commit."""
+        incident_id = incident.id
+        if mode != ACTIVE_MODE:
+            self.defer(lambda: _quiet(stop_active_loop(incident_id)))
+            return
+        interval = await resolve_interval(self._session, incident)
+        self.defer(
+            lambda: _quiet(ensure_active_loop(incident_id, interval_s=interval))
+        )
 
     async def request_investigation(
         self,

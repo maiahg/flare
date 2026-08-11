@@ -126,6 +126,25 @@ class MitigationSettings(BaseModel):
     enabled: bool = True
     max_options: int = 3
 
+class ActiveModeSettings(BaseModel):
+    """Active-mode periodic refresh."""
+
+    refresh_interval_s: int = 300
+    min_refresh_interval_s: int = 60
+    agents: tuple[str, ...] = ("telemetry", "impact")
+
+
+class RecoverySettings(BaseModel):
+    """RecoveryWatcher polling + the recovered/not-recovered rule."""
+
+    poll_interval_s: int = 60
+    max_polls: int = 20
+    metric: str = "p99_ms"
+    window_minutes: int = 60
+    recovered_ratio: float = 1.5
+    degraded_ratio: float = 2.0
+    default_service: str = "checkout-api"
+
 class GovernorSettings(BaseModel):
     """Anti-spam governor budget + dedup tunables"""
 

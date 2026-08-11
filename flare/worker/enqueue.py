@@ -34,6 +34,19 @@ async def enqueue_comms_draft(payload: dict[str, Any]) -> None:
     pool = await get_arq_pool()
     await pool.enqueue_job("generate_comms_draft", payload)
 
+
+async def enqueue_active_refresh(payload: dict[str, Any], *, defer_by: int = 0) -> None:
+    """Schedule the next active-mode refresh tick."""
+    pool = await get_arq_pool()
+    await pool.enqueue_job("active_refresh", payload, _defer_by=defer_by or None)
+
+
+async def enqueue_recovery_watch(payload: dict[str, Any], *, defer_by: int = 0) -> None:
+    """Schedule a post-mitigation recovery poll (read-only)."""
+    pool = await get_arq_pool()
+    await pool.enqueue_job("recovery_watch", payload, _defer_by=defer_by or None)
+
+
 async def enqueue_postmortem(payload: dict[str, Any]) -> None:
     """Generate a postmortem draft on the worker. """
     pool = await get_arq_pool()

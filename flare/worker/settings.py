@@ -3,6 +3,7 @@ from __future__ import annotations
 from arq.connections import RedisSettings
 
 from flare.config import get_settings
+from flare.pipeline.active import active_refresh, recovery_watch
 from flare.pipeline.adaptive import run_adaptive_investigation
 from flare.pipeline.comms import generate_comms_draft
 from flare.pipeline.investigation import run_initial_investigation
@@ -29,6 +30,8 @@ class WorkerSettings:
         run_adaptive_investigation,
         generate_comms_draft,
         generate_postmortem_draft,
+        active_refresh,
+        recovery_watch,
     ]
     redis_settings = _redis_settings()
     on_startup = on_startup

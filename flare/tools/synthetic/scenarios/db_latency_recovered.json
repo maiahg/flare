@@ -1,0 +1,55 @@
+{
+  "name": "db_latency_recovered",
+  "incident_summary": "The same incident as db_latency_spike, read after the pool-size change was rolled back at 14:12: p99 and error rate are back to their pre-incident level.",
+  "metrics": {
+    "checkout-api": {
+      "p99_ms": { "13:59": 118, "14:00": 120, "14:01": 940, "14:05": 910, "14:12": 640, "14:15": 132 },
+      "error_rate": { "13:59": 0.2, "14:00": 0.3, "14:01": 4.1, "14:05": 3.8, "14:12": 1.1, "14:15": 0.3 }
+    },
+    "payments-svc": {
+      "p99_ms": { "13:59": 90, "14:00": 210, "14:01": 640, "14:12": 300, "14:15": 96 },
+      "error_rate": { "13:59": 0.1, "14:00": 1.2, "14:01": 2.9, "14:12": 0.6, "14:15": 0.1 }
+    }
+  },
+  "logs": [
+    { "at": "14:03", "service": "payments-svc", "level": "error", "text": "pool timeout acquiring connection", "count": 2140 },
+    { "at": "14:13", "service": "payments-svc", "level": "info", "text": "connection pool max restored to 50", "count": 1 }
+  ],
+  "traces": {
+    "available_after_minutes": 5,
+    "spans": [
+      { "service": "checkout-api", "op": "POST /checkout", "p99_ms": 132, "downstream": "payments-svc" }
+    ]
+  },
+  "deploys": [
+    {
+      "id": "4821",
+      "service": "payments-svc",
+      "at": "14:00",
+      "author": "@dev-jane",
+      "diff_summary": "reduce db connection pool max 50 -> 10 to cut idle connections",
+      "files": ["config/database.yml", "app/payments/pool.rb"]
+    },
+    {
+      "id": "4823",
+      "service": "payments-svc",
+      "at": "14:12",
+      "author": "@dev-jane",
+      "diff_summary": "revert #4821: restore db connection pool max to 50",
+      "files": ["config/database.yml", "app/payments/pool.rb"]
+    }
+  ],
+  "code": {
+    "payments-svc": {
+      "owners": ["@payments-team"],
+      "recent_pr": "https://github.com/acme/payments-svc/pull/514",
+      "blame": "pool.rb line 22 reverted in #4823 (@dev-jane)"
+    }
+  },
+  "flags": [
+    { "key": "pay_v2", "service": "payments-svc", "at": "13:58", "from": 25, "to": 50, "actor": "@dev-lin" }
+  ],
+  "history": [
+    { "at": "2024-11-02", "title": "checkout latency from pool exhaustion", "resolution": "reverted pool size change" }
+  ]
+}

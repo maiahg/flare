@@ -169,6 +169,9 @@ async def decide_approval(
 
         await resume_run(run_id, {"approval_id": str(approval.id), "decision": decision})
 
+    if decision == "approved" and approval.subject_type == SUBJECT_MITIGATION:
+        await _watch_for_recovery(incident.id)
+
     _logger.info(
         "approval decided",
         extra={
@@ -180,6 +183,15 @@ async def decide_approval(
     return approval
 
 
+async def _watch_for_recovery(incident_id: uuid.UUID) -> None:
+    """Start watching for recovery once a mitigation is approved"""
+    from flare.active.scheduler import schedule_recovery_watch
+
+    try:
+        await schedule_recovery_watch(incident_id, reason="mitigation approved")
+    except Exception: 
+        _logger.warning("failed to schedule the recovery watch", exc_info=True)
+
 def _run_id_of(option: MitigationOption | None) -> uuid.UUID | None:
     """The run that proposed an option, read from its provenance envelope."""
     if option is None:
@@ -187,7 +199,7 @@ def _run_id_of(option: MitigationOption | None) -> uuid.UUID | None:
     raw = (option.source or {}).get("run_id")
     try:
         return uuid.UUID(str(raw)) if raw else None
-    except ValueError:  # pragma: no cover - defensive
+    except ValueError:  
         return None
 
 

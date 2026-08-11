@@ -20,6 +20,9 @@ from flare.slack.modals import SlackModals, loading_view
 from flare.slack.posting import SlackPoster, post_incident_card
 from flare.steering import SteeringError, SteeringService, slack_actor
 from flare.worker.enqueue import (
+    enqueue_active_refresh as enqueue_refresh,
+)
+from flare.worker.enqueue import (
     enqueue_adaptive_run,
     enqueue_comms_draft,
     enqueue_initial_run,
@@ -38,7 +41,7 @@ _USAGE = (
     "`/flare correct \"what's wrong\"`, "
     "`/flare mode <quiet|scribe|assist|active>`, `/flare mitigation`, "
     "`/flare draft-update <internal|support|status|exec>`, `/flare postmortem`, "
-    "or a read: "
+    "`/flare refresh`, or a read: "
     "`/flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
 )
 
@@ -93,6 +96,10 @@ async def handle(
         )
     if cmd.action == "mitigation":
         return await _handle_mitigation(
+            channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
+    if cmd.action == "refresh":
+        return await _handle_refresh(
             channel_id=channel_id, team_id=team_id, user_id=user_id
         )
     if cmd.action == "postmortem":
@@ -279,6 +286,27 @@ async def _handle_mitigation(
             actor=slack_actor(user_id or "unknown"),
             dashboard_url=_dashboard_url(incident.id),
         )
+
+
+async def _handle_refresh(
+    *, channel_id: str, team_id: str, user_id: str | None
+) -> dict[str, Any]:
+    """`/flare refresh` — re-read telemetry and re-rank hypotheses now."""
+    async with get_sessionmaker()() as session:
+        incident = await incident_for_channel(session, channel_id, team_id=team_id)
+        if incident is None:
+            return _ephemeral("No flare incident is tracking this channel.")
+        incident_id = incident.id
+    await enqueue_refresh(
+        {
+            "incident_id": str(incident_id),
+            "token": "",
+            "tick": 0,
+            "manual": True,
+            "user_id": user_id,
+        }
+    )
+    return _ephemeral(":arrows_counterclockwise: Refreshing telemetry and re-ranking hypotheses…")
 
 
 async def _handle_postmortem(
