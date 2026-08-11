@@ -14,15 +14,57 @@ export const incidentKeys = {
   usage: (id: string) => ["incident", id, "usage"] as const,
 };
 
-export function useIncidents() {
+export function useIncidents(status?: string) {
   return useQuery({
-    queryKey: incidentKeys.all,
+    queryKey: status ? [...incidentKeys.all, { status }] : incidentKeys.all,
     queryFn: async () => {
-      const { data, error } = await api.GET("/api/v1/incidents");
+      const { data, error } = await api.GET("/api/v1/incidents", {
+        params: { query: status ? { status } : {} },
+      });
       if (error) throw new Error("failed to load incidents");
       return data;
     },
   });
+}
+
+export type Readiness = {
+  state: "ready" | "degraded" | "unknown";
+  label: string;
+  checks: { database: boolean; redis: boolean };
+};
+
+export function useReadiness(): Readiness {
+  const query = useQuery({
+    queryKey: ["readyz"],
+    refetchInterval: 15_000,
+    retry: false,
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/readyz");
+      const body = (data ?? error) as
+        | { status?: string; checks?: { database?: boolean; redis?: boolean } }
+        | undefined;
+      if (!body && !response.ok) throw new Error("readiness check failed");
+      return {
+        ok: response.ok && body?.status === "ok",
+        database: Boolean(body?.checks?.database),
+        redis: Boolean(body?.checks?.redis),
+      };
+    },
+  });
+
+  if (!query.data) {
+    return {
+      state: "unknown",
+      label: query.isLoading ? "Checking agent…" : "Agent unreachable",
+      checks: { database: false, redis: false },
+    };
+  }
+  const { ok, database, redis } = query.data;
+  return {
+    state: ok ? "ready" : "degraded",
+    label: ok ? "Agent online" : "Agent degraded",
+    checks: { database, redis },
+  };
 }
 
 export function useIncident(id: string) {

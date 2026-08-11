@@ -16,14 +16,12 @@ from flare.llm import get_llm_client
 from flare.memory import MemoryRepository
 from flare.models.claims import Decision, Fact, OpenQuestion, TimelineEntry
 from flare.models.ingestion import SlackMessage
+from flare.models.provenance import HUMAN_STATEMENT_KIND
 from flare.pipeline.mapping import plan_claims
 from flare.pipeline.triage import triage_message
 from flare.worker.enqueue import enqueue_adaptive_run
 
 _logger = logging.getLogger("flare.pipeline")
-
-_SOURCE_KIND = "human_statement"  # signals come from a human's Slack message
-
 
 class _Envelope(TypedDict):
     incident_id: uuid.UUID
@@ -84,7 +82,7 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
         source = {"type": "slack", "ts": slack_ts, "user": user_id}
         common: _Envelope = {
             "incident_id": incident_id,
-            "kind": _SOURCE_KIND,
+            "kind": HUMAN_STATEMENT_KIND,
             "confidence": 0.8,
             "source": source,
             "created_by": "scribe",

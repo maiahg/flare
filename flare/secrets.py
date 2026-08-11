@@ -9,7 +9,7 @@ from flare.config import Settings, get_settings
 SLACK_SIGNING_SECRET = "slack.signing_secret"
 SLACK_CLIENT_SECRET = "slack.client_secret"
 SLACK_BOT_TOKEN = "slack.bot_token"
-OPENROUTER_API_KEY = "openrouter.api_key"
+LLM_PROVIDER_API_KEY = "llm.provider.api_key"
 
 class SecretNotFoundError(KeyError):
     """Raised when a requested secret name is unknown to the provider."""

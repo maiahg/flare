@@ -27,6 +27,7 @@ from flare.models.claims import (
     Summary,
 )
 from flare.models.core import Incident
+from flare.models.provenance import HUMAN_STATEMENT_KIND, INFERENCE_KIND
 from flare.steering.actors import Actor
 from flare.steering.errors import NotFoundError, ValidationError
 
@@ -36,10 +37,6 @@ CONTEXT_LIMIT = 8
 
 AGENT_DRAFT_CONFIDENCE = 0.6
 HUMAN_DRAFT_CONFIDENCE = 1.0
-
-AGENT_KIND = "inference"
-HUMAN_KIND = "human_statement"
-
 
 @dataclass(frozen=True)
 class DraftResult:
@@ -125,7 +122,7 @@ class CommsService:
             audience=audience,
             body=body,
             created_by=CommsAgent.agent_name,
-            kind=AGENT_KIND,
+            kind=INFERENCE_KIND,
             confidence=AGENT_DRAFT_CONFIDENCE,
             source={
                 "type": "comms",
@@ -158,7 +155,7 @@ class CommsService:
             audience=audience,
             body=text,
             created_by=self._actor.ref,
-            kind=HUMAN_KIND,
+            kind=HUMAN_STATEMENT_KIND,
             confidence=HUMAN_DRAFT_CONFIDENCE,
             source={
                 "type": "human",

@@ -1,12 +1,139 @@
 @import "tailwindcss";
 
+/**
+ * Admin-console theme: near-black rail, light content surface.
+ *
+ * Every colour in the app is declared here. Components reference the tokens
+ * (`text-[var(--muted)]`, `bg-[var(--tone-critical-bg)]`) rather than Tailwind
+ * palette classes, so the whole product can be re-skinned from this block and
+ * no component can quietly invent an off-palette blue.
+ */
 :root {
-  --background: #0b0d12;
-  --foreground: #e6e8ec;
+  /* Neutrals — a cool, low-chroma ramp. Ink is near-black rather than navy;
+     saturated "dark blue" text is what makes a console look dated. */
+  --background: #f7f8fa;
+  --surface: #ffffff;
+  --surface-muted: #fafbfc;
+  --border: #e8eaef;
+  --border-strong: #d7dbe3;
+  --foreground: #0d0f14;
+  --muted: #6b7280; /* secondary text — 4.8:1 on surface, AA */
+  --faint: #9aa1ae; /* decoration only (icons, rules); fails AA as text */
+
+  /* Navigation rail. Neutral black, not navy; the active row is lifted by an
+     accent-tinted surface instead of a bright blue block. */
+  --sidebar: #0b0c10;
+  --sidebar-hover: #16181f;
+  --sidebar-active: #1d1e2c;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-fg: #e6e8ee;
+  --sidebar-muted: #8b90a0;
+  --sidebar-faint: #61667a;
+
+  /* One accent: indigo-violet. */
+  --accent: #5b5bd6;
+  --accent-hover: #4a4ac4;
+  --accent-soft: #eef0fe;
+
+  /*
+   * Semantic tones, named by meaning rather than hue so a status can be
+   * re-toned without renaming anything. Four channels, because one colour
+   * cannot do all three jobs:
+   *   bg/fg/bd  tinted chip — fg is dark enough to read on `bg` (AA normal)
+   *   solid     filled mark on white — chart bar, dot, progress fill
+   *   text      large figure on white — `solid` is too light, chip `fg` goes
+   *             muddy at 28px (amber turns brown). AA-large only; never body.
+   */
+  --tone-neutral-bg: #f1f3f6;
+  --tone-neutral-fg: #59606e;
+  --tone-neutral-bd: #e2e6ec;
+  --tone-neutral-solid: #98a1b3;
+  --tone-neutral-text: #4b5261;
+
+  --tone-critical-bg: #fff0f1;
+  --tone-critical-fg: #c02840;
+  --tone-critical-bd: #ffdade;
+  --tone-critical-solid: #e5484d;
+  --tone-critical-text: #dc2b45;
+
+  --tone-warning-bg: #fff7e9;
+  --tone-warning-fg: #9a5714;
+  --tone-warning-bd: #ffe4bb;
+  --tone-warning-solid: #f5a524;
+  --tone-warning-text: #d5820b;
+
+  --tone-info-bg: #eef1ff;
+  --tone-info-fg: #4045c2;
+  --tone-info-bd: #dee1ff;
+  --tone-info-solid: #5b5bd6;
+  --tone-info-text: #5354d8;
+
+  --tone-positive-bg: #e9f7ef;
+  --tone-positive-fg: #16794c;
+  --tone-positive-bd: #c9ebd9;
+  --tone-positive-solid: #21a366;
+  --tone-positive-text: #189259;
+
+  --tone-special-bg: #f4f0ff;
+  --tone-special-fg: #6641d0;
+  --tone-special-bd: #e5dcff;
+  --tone-special-solid: #8257e5;
+  --tone-special-text: #7c4ee0;
+
+  /* Cards sit on a tinted page, so the shadow is a hairline lift, not a drop. */
+  --shadow-card: 0 1px 2px rgba(13, 15, 20, 0.04),
+    0 1px 3px rgba(13, 15, 20, 0.02);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, sans-serif;
+/*
+ * Everything below is layered on purpose. Tailwind v4 emits its own rules
+ * inside `@layer base/components/utilities`, and unlayered author CSS beats
+ * *all* layered CSS regardless of specificity — an unlayered `a { color:
+ * inherit }` silently wins over every `text-*` utility on a link.
+ */
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+@layer components {
+  /* Section eyebrow above card rows and inside the sidebar. Muted, not faint:
+     these are labels ('OPEN', 'STATUS'), and at 0.68rem they need the contrast.
+     A utility (`text-[var(--sidebar-faint)]`) still overrides it, as it should. */
+  .eyebrow {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Tinted state chip. The tone supplies the three colours via --tone-*. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    background: var(--chip-bg);
+    color: var(--chip-fg);
+    box-shadow: inset 0 0 0 1px var(--chip-bd);
+  }
 }

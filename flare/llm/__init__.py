@@ -8,6 +8,7 @@ from flare.llm.errors import (
 )
 from flare.llm.factory import get_llm_client, set_llm_client
 from flare.llm.fake import FakeLLMClient
+from flare.llm.parsing import extract_json
 from flare.llm.redaction import redact
 from flare.llm.usage import LLMUsage
 
@@ -23,5 +24,6 @@ __all__ = [
     "get_llm_client",
     "set_llm_client",
     "FakeLLMClient",
+    "extract_json",
     "redact",
 ]

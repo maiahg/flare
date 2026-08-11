@@ -21,6 +21,7 @@ from flare.db.base import Base, TimestampMixin, UUIDAuditMixin
 INCIDENT_STATUSES = ("open", "mitigating", "monitoring", "resolved", "closed")
 INCIDENT_SEVERITIES = ("sev1", "sev2", "sev3", "sev4", "unknown")
 INCIDENT_MODES = ("quiet", "scribe", "assist", "active")
+ACTIVE_MODE = "active"
 
 DEFAULT_INCIDENT_STATUS = "open"
 DEFAULT_INCIDENT_SEVERITY = "unknown"

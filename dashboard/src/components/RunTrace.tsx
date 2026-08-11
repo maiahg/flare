@@ -1,32 +1,8 @@
 import type { AgentTrace, Run, RunDetail, ToolCall } from "@/lib/api";
+import { EmptyState } from "@/components/ui/Panel";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { NUMBER, absoluteTime, relativeTime } from "@/lib/format";
 
-function StatusPill({ status }: { status?: string | null }) {
-  const color =
-    status === "done" || status === "ok"
-      ? "#137333"
-      : status === "error" || status === "failed"
-        ? "#a50e0e"
-        : "#8a6d00";
-  return (
-    <span
-      data-testid="status-pill"
-      style={{
-        fontSize: "0.75rem",
-        color,
-        border: `1px solid ${color}`,
-        borderRadius: 4,
-        padding: "0 0.35rem",
-      }}
-    >
-      {status ?? "pending"}
-    </span>
-  );
-}
-
-/**
- * `agent_traces.tokens` is free-form JSONB; the recorder writes
- * `{in, out, calls}` (see flare/llm/usage.py). Read it defensively.
- */
 function tokenSummary(tokens: AgentTrace["tokens"]): string | null {
   if (!tokens) return null;
   const asNum = (v: unknown) => (typeof v === "number" ? v : 0);
@@ -34,22 +10,28 @@ function tokenSummary(tokens: AgentTrace["tokens"]): string | null {
   const tout = asNum(tokens["out"]);
   const calls = asNum(tokens["calls"]);
   if (tin === 0 && tout === 0 && calls === 0) return null;
-  return `${tin} in / ${tout} out · ${calls} call${calls === 1 ? "" : "s"}`;
+  return `${NUMBER.format(tin)} in / ${NUMBER.format(tout)} out · ${calls} call${
+    calls === 1 ? "" : "s"
+  }`;
 }
 
 function ToolCallRow({ call }: { call: ToolCall }) {
   return (
-    <li style={{ listStyle: "none", padding: "0.25rem 0", opacity: 0.9 }}>
-      <code style={{ fontSize: "0.8rem" }}>{call.tool_name}</code>
+    <li className="flex list-none flex-wrap items-center gap-x-2 gap-y-1 py-1">
+      <code className="rounded bg-[var(--tone-neutral-bg)] px-1.5 py-0.5 text-xs text-[var(--tone-neutral-fg)]">
+        {call.tool_name}
+      </code>
       {call.system ? (
-        <span style={{ opacity: 0.6 }}> · {call.system}</span>
+        <span className="text-xs text-[var(--muted)]">{call.system}</span>
       ) : null}
       {typeof call.latency_ms === "number" ? (
-        <span style={{ opacity: 0.6 }}> · {call.latency_ms}ms</span>
-      ) : null}{" "}
+        <span className="text-xs tabular-nums text-[var(--muted)]">
+          {call.latency_ms}ms
+        </span>
+      ) : null}
       <StatusPill status={call.status} />
       {call.error ? (
-        <span style={{ color: "#a50e0e" }}> · {call.error}</span>
+        <span className="text-xs text-[var(--tone-critical-fg)]">{call.error}</span>
       ) : null}
     </li>
   );
@@ -60,41 +42,36 @@ function AgentTraceRow({ trace }: { trace: AgentTrace }) {
   return (
     <li
       data-testid="agent-trace"
-      style={{
-        listStyle: "none",
-        borderLeft: "2px solid #ddd",
-        paddingLeft: "0.75rem",
-        marginBottom: "0.75rem",
-      }}
+      className="list-none border-l-2 border-[var(--border)] pl-3.5 pb-4 last:pb-0"
     >
-      <div style={{ fontWeight: 600 }}>
-        {trace.seq != null ? `${trace.seq}. ` : ""}
-        {trace.agent_name} <StatusPill status={trace.status} />
+      <div className="flex items-center gap-2">
+        <span className="font-medium">
+          {trace.seq != null ? (
+            <span className="mr-1 text-[var(--muted)] tabular-nums">
+              {trace.seq}.
+            </span>
+          ) : null}
+          {trace.agent_name}
+        </span>
+        <StatusPill status={trace.status} />
       </div>
       {trace.model_name || tokens ? (
-        <div
-          data-testid="trace-usage"
-          style={{ fontSize: "0.75rem", opacity: 0.6 }}
-        >
+        <div data-testid="trace-usage" className="text-xs text-[var(--muted)]">
           {trace.model_name ?? "—"}
           {tokens ? ` · ${tokens}` : ""}
         </div>
       ) : null}
       {trace.reasoning_summary ? (
-        <p style={{ margin: "0.25rem 0", opacity: 0.75, fontSize: "0.85rem" }}>
-          {trace.reasoning_summary}
-        </p>
+        <p className="my-1 text-sm text-[var(--foreground)]/85">{trace.reasoning_summary}</p>
       ) : null}
       {trace.tool_calls && trace.tool_calls.length > 0 ? (
-        <ul style={{ margin: "0.25rem 0", padding: 0 }}>
+        <ul className="m-0 mt-1 p-0">
           {trace.tool_calls.map((c) => (
             <ToolCallRow key={c.id} call={c} />
           ))}
         </ul>
       ) : (
-        <p style={{ margin: 0, opacity: 0.5, fontSize: "0.8rem" }}>
-          No tool calls
-        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">No tool calls</p>
       )}
     </li>
   );
@@ -109,24 +86,39 @@ export function RunList({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  if (runs.length === 0) return <p>No runs yet.</p>;
+  if (runs.length === 0) return <EmptyState>No runs yet.</EmptyState>;
   return (
-    <ul aria-label="runs" style={{ padding: 0, margin: 0 }}>
-      {runs.map((r) => (
-        <li key={r.id} style={{ listStyle: "none", marginBottom: "0.5rem" }}>
-          <button
-            onClick={() => onSelect(r.id)}
-            disabled={r.id === selectedId}
-            style={{ textAlign: "left", width: "100%", padding: "0.5rem" }}
-          >
-            <strong>{r.run_type}</strong> <StatusPill status={r.status} />
-            <br />
-            <span style={{ opacity: 0.6, fontSize: "0.8rem" }}>
-              {new Date(r.created_at).toLocaleString()}
-            </span>
-          </button>
-        </li>
-      ))}
+    <ul aria-label="runs" className="m-0 list-none p-0">
+      {runs.map((r) => {
+        const selected = r.id === selectedId;
+        return (
+          <li key={r.id}>
+            <button
+              onClick={() => onSelect(r.id)}
+              aria-current={selected ? "true" : undefined}
+              className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                selected
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                  : "border-transparent hover:bg-[var(--surface-muted)]"
+              }`}
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium">
+                  {r.run_type}
+                </span>
+                <StatusPill status={r.status} />
+              </span>
+              <span
+                className="mt-0.5 block text-xs text-[var(--muted)]"
+                title={absoluteTime(r.created_at)}
+              >
+                {relativeTime(r.created_at)}
+                {r.trigger ? ` · ${r.trigger}` : ""}
+              </span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -137,26 +129,27 @@ export function RunDetailView({ run }: { run: RunDetail }) {
   );
   return (
     <section aria-label="run detail">
-      <header style={{ marginBottom: "1rem" }}>
-        <h2 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-          {run.run_type} run <StatusPill status={run.status} />
-        </h2>
-        {run.summary ? <p style={{ opacity: 0.8 }}>{run.summary}</p> : null}
+      <header className="mb-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-[0.95rem] font-semibold">{run.run_type} run</h3>
+          <StatusPill status={run.status} />
+        </div>
+        {run.summary ? (
+          <p className="mt-1 text-sm text-[var(--foreground)]/85">{run.summary}</p>
+        ) : null}
         {run.token_in != null || run.token_out != null ? (
-          <p
-            data-testid="run-tokens"
-            style={{ fontSize: "0.8rem", opacity: 0.7 }}
-          >
-            Total tokens: {run.token_in ?? 0} in / {run.token_out ?? 0} out
+          <p data-testid="run-tokens" className="mt-1 text-xs text-[var(--muted)]">
+            Total tokens: {NUMBER.format(run.token_in ?? 0)} in /{" "}
+            {NUMBER.format(run.token_out ?? 0)} out
           </p>
         ) : null}
         {run.limitations && run.limitations.length > 0 ? (
-          <p style={{ color: "#8a6d00", fontSize: "0.85rem" }}>
+          <p className="mt-2 rounded-md bg-[var(--tone-warning-bg)] px-3 py-2 text-xs text-[var(--tone-warning-fg)] ring-1 ring-inset ring-[var(--tone-warning-bd)]">
             Limitations: {run.limitations.join("; ")}
           </p>
         ) : null}
       </header>
-      <ul style={{ padding: 0, margin: 0 }}>
+      <ul className="m-0 p-0">
         {traces.map((t) => (
           <AgentTraceRow key={t.id} trace={t} />
         ))}

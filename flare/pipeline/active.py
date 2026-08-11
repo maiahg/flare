@@ -17,15 +17,11 @@ from flare.adaptive.runner import leading_hypothesis, start_adaptive_run
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.investigation.graph import InvestigationPoster
-from flare.models.core import Incident
+from flare.models.core import ACTIVE_MODE, Incident
 from flare.redis import get_redis
 from flare.slack.posting import InvestigationSlackPoster, SlackPoster
 
 _logger = logging.getLogger("flare.pipeline.active")
-
-#: The mode that gets periodic refreshes. Everything else stops the loop.
-ACTIVE_MODE = "active"
-
 
 async def _incident_state(incident_id: uuid.UUID) -> tuple[str, str | None] | None:
     async with get_sessionmaker()() as session:

@@ -15,6 +15,7 @@ export function useIncidentStream(incidentId: string) {
     );
 
     const invalidate = () => {
+      // Prefix match: refetch every query for this incident.
       queryClient.invalidateQueries({ queryKey: ["incident", incidentId] });
       queryClient.invalidateQueries({ queryKey: incidentKeys.all });
     };

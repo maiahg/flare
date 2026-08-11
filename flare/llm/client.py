@@ -4,35 +4,109 @@ import asyncio
 import json
 import logging
 import random
-from dataclasses import dataclass
-from typing import Any, TypeVar, cast
+from dataclasses import dataclass, replace
+from typing import Any, Literal, TypeVar, cast
 
-from openai import AsyncOpenAI, APIStatusError, RateLimitError
+from openai import APIStatusError, AsyncOpenAI, Omit, RateLimitError, omit
 from openai.types.chat import ChatCompletionMessageParam
-from openai.types.shared_params import ResponseFormatJSONSchema
+from openai.types.shared_params import (
+    ResponseFormatJSONObject,
+    ResponseFormatJSONSchema,
+)
 from pydantic import BaseModel, ValidationError
 
 from flare.config import get_settings
 from flare.llm.base import LLMResult
-from flare.llm.errors import RateLimitedError, StructuredOutputError, ProviderAuthError
+from flare.llm.errors import (
+    ModelNotSupportedError,
+    ProviderAuthError,
+    RateLimitedError,
+    StructuredOutputError,
+)
+from flare.llm.parsing import extract_json
 from flare.llm.redaction import redact
+from flare.llm.usage import estimate_tokens
 from flare.secrets import llm_api_key
 
 T = TypeVar("T", bound=BaseModel)
 _logger = logging.getLogger("flare.llm")
 
-_RESPONSES_ONLY_MODELS: set[str] = set()
+Transport = Literal["chat", "responses"]
+SchemaMode = Literal["json_schema", "json_object", "prompt_only"]
+
+ResponseFormat = ResponseFormatJSONSchema | ResponseFormatJSONObject
 
 
-def _requires_responses_api(exc: APIStatusError) -> bool:
-    """True for the provider's "use the Responses API instead" 400."""
-    return exc.status_code == 400 and "/v1/responses" in str(exc)
+@dataclass(frozen=True)
+class _Capabilities:
+    transport: Transport = "chat"
+    temperature: bool = True
+    schema_mode: SchemaMode = "json_schema"
+
+
+_CAPABILITIES: dict[tuple[str, str], _Capabilities] = {}
+
+_SCHEMA_FALLBACK: dict[SchemaMode, SchemaMode | None] = {
+    "json_schema": "json_object",
+    "json_object": "prompt_only",
+    "prompt_only": None,
+}
+
+
+def reset_capabilities() -> None:
+    _CAPABILITIES.clear()
+
+
+def _mentions(text: str, *needles: str) -> bool:
+    lowered = text.lower()
+    return any(needle in lowered for needle in needles)
+
+
+def _requires_responses_api(message: str) -> bool:
+    return "/v1/responses" in message
+
+
+def _requires_foreign_api(message: str) -> bool:
+    return _mentions(
+        message, "anthropic/v1/messages", "/v1/messages", "generatecontent"
+    )
+
+
+def _unknown_model(status: int, message: str) -> bool:
+    return status in (400, 404) and _mentions(
+        message,
+        "no endpoints found",
+        "model not found",
+        "does not exist",
+        "unknown model",
+        "invalid model",
+        "model_not_found",
+    )
+
+
+def _degrade(caps: _Capabilities, message: str) -> _Capabilities | None:
+    if caps.transport == "chat" and _requires_responses_api(message):
+        return replace(caps, transport="responses")
+    if caps.transport == "responses" and _mentions(message, "/v1/responses"):
+        return replace(caps, transport="chat")
+    if caps.temperature and _mentions(message, "temperature"):
+        return replace(caps, temperature=False)
+    if _mentions(
+        message,
+        "response_format",
+        "json_schema",
+        "text.format",
+        "structured output",
+        "response format",
+    ):
+        weaker = _SCHEMA_FALLBACK[caps.schema_mode]
+        if weaker is not None:
+            return replace(caps, schema_mode=weaker)
+    return None
 
 
 @dataclass(frozen=True)
 class _RawCompletion:
-    """Transport-agnostic result of one provider call."""
-
     content: str
     model: str
     tokens_in: int | None
@@ -42,9 +116,8 @@ class _RawCompletion:
 
 @dataclass
 class _Attempts:
-    """Two independent counters for one call: schema repairs and 429 retries."""
-
     repairs: int = 0
+    downgrades: int = 0
     rate_limits: int = 0
 
 
@@ -56,13 +129,11 @@ def _retry_after_seconds(exc: Exception) -> float | None:
         return None
     try:
         return max(0.0, float(raw))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
 class OpenAICompatibleClient:
-    """Structured-output client over OpenRouter's OpenAI-compatible endpoint"""
-
     def __init__(self) -> None:
         settings = get_settings()
         provider = settings.llm.provider
@@ -79,12 +150,53 @@ class OpenAICompatibleClient:
             api_key=api_key,
             timeout=provider.timeout_seconds,
             default_headers=dict(provider.headers) or None,
-            max_retries=0, 
+            max_retries=0,  # retries/fallback are this class's job, not the SDK's
         )
         self._default_model = settings.llm.models.default
         self._max_repair = settings.llm.max_repair_attempts
-        self._rate_limit = settings.llm.rate_limit  
+        self._max_downgrades = provider.max_capability_downgrades
+        self._rate_limit = settings.llm.rate_limit
 
+    # --- capability bookkeeping ------------------------------------------------
+
+    def _capabilities(self, model_id: str) -> _Capabilities:
+        return _CAPABILITIES.get((self._base_url, model_id), _Capabilities())
+
+    def _learn(self, model_id: str, caps: _Capabilities, exc: APIStatusError) -> bool:
+        message = str(exc)
+        if exc.status_code in (401, 403):
+            raise ProviderAuthError(
+                f"{self._base_url} rejected the credential ({exc.status_code}); "
+                f"check llm.provider.api_key: {message}"
+            ) from exc
+        if _requires_foreign_api(message):
+            raise ModelNotSupportedError(
+                f"{model_id} needs a non-OpenAI protocol this client does not speak "
+                f"({message}). Pick a model served on /v1/chat/completions or "
+                "/v1/responses."
+            ) from exc
+        if _unknown_model(exc.status_code, message):
+            raise ModelNotSupportedError(
+                f"{self._base_url} will not serve model {model_id!r}: {message}. "
+                "Check llm.models.* against https://openrouter.ai/models."
+            ) from exc
+        if exc.status_code not in (400, 404, 422):
+            return False
+
+        degraded = _degrade(caps, message)
+        if degraded is None:
+            return False
+        if _CAPABILITIES.get((self._base_url, model_id)) == degraded:
+            return False
+        _CAPABILITIES[(self._base_url, model_id)] = degraded
+        _logger.info(
+            "%s/%s rejected a request shape; degrading %s -> %s",
+            self._base_url,
+            model_id,
+            caps,
+            degraded,
+        )
+        return True
 
     async def _backoff(self, attempts: _Attempts, exc: Exception) -> bool:
         if attempts.rate_limits >= self._rate_limit.max_retries:
@@ -99,7 +211,8 @@ class OpenAICompatibleClient:
         delay = min(delay, self._rate_limit.max_delay_s)
         delay *= 1 + random.random() * 0.25
         _logger.warning(
-            "Provider rate limited (attempt %d/%d); waiting %.1fs",
+            "%s rate limited (attempt %d/%d); waiting %.1fs",
+            self._base_url,
             attempts.rate_limits,
             self._rate_limit.max_retries,
             delay,
@@ -107,6 +220,23 @@ class OpenAICompatibleClient:
         await asyncio.sleep(delay)
         return True
 
+    # --- transports -----------------------------------------------------------
+
+    def _chat_response_format(
+        self, caps: _Capabilities, schema_name: str, json_schema: dict[str, Any]
+    ) -> ResponseFormat | Omit:
+        if caps.schema_mode == "json_schema":
+            return {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name,
+                    "schema": json_schema,
+                    "strict": False,
+                },
+            }
+        if caps.schema_mode == "json_object":
+            return {"type": "json_object"}
+        return omit
 
     async def _call_chat(
         self,
@@ -151,7 +281,6 @@ class OpenAICompatibleClient:
         schema_name: str,
         json_schema: dict[str, Any],
     ) -> _RawCompletion:
-        """Call /v1/responses for models the provider restricts to that endpoint."""
         text: Any = omit
         if caps.schema_mode == "json_schema":
             text = {
@@ -181,6 +310,44 @@ class OpenAICompatibleClient:
             request_id=self._request_id(raw.headers),
         )
 
+    def _request_id(self, headers: Any) -> str | None:
+        if not self._request_id_header:
+            return None
+        value = headers.get(self._request_id_header)
+        return str(value) if value else None
+
+    async def _invoke(
+        self,
+        *,
+        caps: _Capabilities,
+        model_id: str,
+        system: str,
+        turns: list[dict[str, str]],
+        temperature: float,
+        schema_name: str,
+        json_schema: dict[str, Any],
+    ) -> _RawCompletion:
+        if caps.transport == "responses":
+            return await self._call_responses(
+                model_id=model_id,
+                system=system,
+                turns=turns,
+                caps=caps,
+                schema_name=schema_name,
+                json_schema=json_schema,
+            )
+        return await self._call_chat(
+            model_id=model_id,
+            system=system,
+            turns=turns,
+            temperature=temperature,
+            caps=caps,
+            schema_name=schema_name,
+            json_schema=json_schema,
+        )
+
+    # --- public surface -------------------------------------------------------
+
     async def structured(
         self,
         *,
@@ -192,44 +359,30 @@ class OpenAICompatibleClient:
         trace_name: str | None = None,
     ) -> LLMResult[T]:
         model_id = model or self._default_model
-        user = redact(user)
+        user = redact(user) 
+
         json_schema = schema.model_json_schema()
-        response_format: ResponseFormatJSONSchema = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": schema.__name__,
-                "schema": json_schema,
-                "strict": False,
-            },
-        }
         system_with_schema = (
             f"{system}\n\n"
             f"Return ONLY a JSON object conforming to this JSON Schema "
-            f"(no prose, no markdown fence):\n{json.dumps(json_schema)}"
+            f"(no prose, no markdown fence, no <think> block):\n{json.dumps(json_schema)}"
         )
         turns: list[dict[str, str]] = [{"role": "user", "content": user}]
 
         last_error: Exception | None = None
         attempts = _Attempts()
         while attempts.repairs <= self._max_repair:
-            use_responses = model_id in _RESPONSES_ONLY_MODELS
+            caps = self._capabilities(model_id)
             try:
-                if use_responses:
-                    raw = await self._call_responses(
-                        model_id=model_id,
-                        system=system_with_schema,
-                        turns=turns,
-                        schema_name=schema.__name__,
-                        json_schema=json_schema,
-                    )
-                else:
-                    raw = await self._call_chat(
-                        model_id=model_id,
-                        system=system_with_schema,
-                        turns=turns,
-                        temperature=temperature,
-                        response_format=response_format,
-                    )
+                raw = await self._invoke(
+                    caps=caps,
+                    model_id=model_id,
+                    system=system_with_schema,
+                    turns=turns,
+                    temperature=temperature,
+                    schema_name=schema.__name__,
+                    json_schema=json_schema,
+                )
             except RateLimitError as exc:
                 if await self._backoff(attempts, exc):
                     continue
@@ -239,26 +392,16 @@ class OpenAICompatibleClient:
                     if await self._backoff(attempts, exc):
                         continue
                     raise RateLimitedError(str(exc)) from exc
-                raise
-
-                if not use_responses and _requires_responses_api(exc):
-                    _RESPONSES_ONLY_MODELS.add(model_id)
-                    _logger.info(
-                        "model %s requires the Responses API; switching transport",
-                        model_id,
-                    )
-                    raw = await self._call_responses(
-                        model_id=model_id,
-                        system=system_with_schema,
-                        turns=turns,
-                        schema_name=schema.__name__,
-                        json_schema=json_schema,
-                    )
-                else:
+                if attempts.downgrades >= self._max_downgrades:
                     raise
+                if not self._learn(model_id, caps, exc):
+                    raise
+                attempts.downgrades += 1
+                continue
 
+            payload = extract_json(raw.content)
             try:
-                value = schema.model_validate_json(raw.content)
+                value = schema.model_validate_json(payload)
             except (ValidationError, json.JSONDecodeError) as exc:
                 last_error = exc
                 attempts.repairs += 1
@@ -268,21 +411,41 @@ class OpenAICompatibleClient:
                         "role": "user",
                         "content": (
                             "Your last reply did not match the schema. "
-                            f"Error: {exc}. Reply again with ONLY valid JSON."
+                            f"Error: {exc}. Reply again with ONLY valid JSON — no "
+                            "markdown fence, no commentary, no reasoning block."
                         ),
                     }
                 )
                 continue
 
-            return LLMResult(
-                value=value,
-                model=raw.model, 
-                tokens_in=raw.tokens_in,
-                tokens_out=raw.tokens_out,
-                provider_request_id=raw.request_id
-            )
+            return self._result(value, raw, system_with_schema, turns)
 
         raise StructuredOutputError(
-            f"{schema.__name__} not produced after {self._max_repair + 1} attempts: "
-            f"{last_error}"
+            f"{schema.__name__} not produced by {model_id} after "
+            f"{self._max_repair + 1} attempts: {last_error}"
         )
+
+    def _result(
+        self,
+        value: T,
+        raw: _RawCompletion,
+        system: str,
+        turns: list[dict[str, str]],
+    ) -> LLMResult[T]:
+        tokens_in, tokens_out = raw.tokens_in, raw.tokens_out
+        estimated = tokens_in is None and tokens_out is None
+        if estimated:
+            prompt = system + "".join(turn["content"] for turn in turns)
+            tokens_in = estimate_tokens(prompt)
+            tokens_out = estimate_tokens(raw.content)
+        return LLMResult(
+            value=value,
+            model=raw.model, 
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            provider_request_id=raw.request_id,
+            tokens_estimated=estimated,
+        )
+
+
+__all__ = ["OpenAICompatibleClient", "reset_capabilities"]

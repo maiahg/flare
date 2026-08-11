@@ -4652,7 +4652,7 @@
           "exhausted"
         ],
         "title": "IncidentUsage",
-        "description": "Token spend for an incident against its budget (no USD \u2014 see \u00a73.2).\n\n``near_cap`` mirrors what the provider reports for the project-wide budget,\nso the dashboard can render an approaching per-incident ceiling and an\napproaching provider ceiling the same way."
+        "description": "Token spend for an incident against its budget (no USD \u2014 see \u00a73.2).\n\n``near_cap`` mirrors what the provider reports for the account-wide budget,\nso the dashboard can render an approaching per-incident ceiling and an\napproaching provider ceiling the same way."
       },
       "InvestigateRequest": {
         "properties": {

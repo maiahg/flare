@@ -1527,7 +1527,7 @@ export interface components {
          * IncidentUsage
          * @description Token spend for an incident against its budget.
          *
-         *     ``near_cap`` mirrors what the provider reports for the project-wide budget,
+         *     ``near_cap`` mirrors what the provider reports for the account-wide budget,
          *     so the dashboard can render an approaching per-incident ceiling and an
          *     approaching provider ceiling the same way.
          */

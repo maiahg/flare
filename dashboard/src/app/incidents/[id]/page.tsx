@@ -1,12 +1,19 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { EvidenceList, HypothesisList } from "@/components/ClaimLists";
 import { IncidentOverview } from "@/components/IncidentOverview";
 import { RunDetailView, RunList } from "@/components/RunTrace";
+import { PageHeader } from "@/components/shell/PageHeader";
+import { INCIDENT_TABS, type IncidentTab } from "@/components/shell/Sidebar";
 import { TokenUsagePanel } from "@/components/TokenUsage";
 import { Timeline } from "@/components/Timeline";
+import { EmptyState, Panel } from "@/components/ui/Panel";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { relativeTime } from "@/lib/format";
 import {
   useEvidence,
   useHypotheses,
@@ -18,22 +25,7 @@ import {
 } from "@/lib/hooks";
 import { useIncidentStream } from "@/lib/useIncidentStream";
 
-type Tab =
-  | "overview"
-  | "timeline"
-  | "runs"
-  | "evidence"
-  | "hypotheses"
-  | "usage";
-
-const TABS: Array<[Tab, string]> = [
-  ["overview", "Overview"],
-  ["timeline", "Timeline"],
-  ["runs", "Runs"],
-  ["evidence", "Evidence"],
-  ["hypotheses", "Hypotheses"],
-  ["usage", "Tokens"],
-];
+const TAB_KEYS = INCIDENT_TABS.map(([key]) => key) as readonly string[];
 
 export default function IncidentPage({
   params,
@@ -41,7 +33,20 @@ export default function IncidentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [tab, setTab] = useState<Tab>("overview");
+  return (
+    <Suspense fallback={<PageHeader title="Incident" />}>
+      <IncidentView id={id} />
+    </Suspense>
+  );
+}
+
+function IncidentView({ id }: { id: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requested = searchParams.get("tab") ?? "overview";
+  const tab = (TAB_KEYS.includes(requested) ? requested : "overview") as IncidentTab;
+
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
 
   // Live: invalidate this incident's queries whenever memory changes.
@@ -62,60 +67,110 @@ export default function IncidentPage({
     }
   }, [runs.data, selectedRun]);
 
+  const setTab = (next: IncidentTab) => {
+    router.replace(next === "overview" ? pathname : `${pathname}?tab=${next}`, {
+      scroll: false,
+    });
+  };
+
+  const data = incident.data;
+
   return (
-    <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
-      <nav style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
-        {TABS.map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            disabled={tab === key}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+    <>
+      <PageHeader
+        breadcrumb={{ label: "Incidents", href: "/incidents" }}
+        title={data?.title ?? "Incident"}
+        subtitle={
+          data ? (
+            <span className="flex flex-wrap items-center gap-2">
+              <StatusPill status={data.status} />
+              <StatusPill status={data.mode} title="Agent mode" />
+              {data.severity ? <span>{data.severity}</span> : null}
+              <span>
+                started {relativeTime(data.started_at ?? data.created_at)}
+              </span>
+            </span>
+          ) : null
+        }
+      />
 
-      {incident.isLoading ? <p>Loading…</p> : null}
-      {incident.isError ? <p>Failed to load incident.</p> : null}
+      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-6">
+        <nav aria-label="incident views" className="flex gap-1 overflow-x-auto">
+          {INCIDENT_TABS.map(([key, label, Icon]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              aria-current={tab === key ? "page" : undefined}
+              className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm transition-colors ${
+                tab === key
+                  ? "border-[var(--accent)] font-medium text-[var(--accent)]"
+                  : "border-transparent text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-      {tab === "overview" && incident.data ? (
-        <IncidentOverview incident={incident.data} />
-      ) : null}
+      <div className="px-6 py-5">
+        {incident.isLoading ? <EmptyState>Loading incident…</EmptyState> : null}
+        {incident.isError ? (
+          <EmptyState>
+            Failed to load incident.{" "}
+            <Link href="/incidents" className="text-[var(--accent)] hover:underline">
+              Back to incidents
+            </Link>
+          </EmptyState>
+        ) : null}
 
-      {tab === "timeline" ? (
-        <Timeline entries={timeline.data ?? []} />
-      ) : null}
+        {tab === "overview" && data ? <IncidentOverview incident={data} /> : null}
 
-      {tab === "runs" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "1.5rem" }}>
-          <RunList
-            runs={runs.data ?? []}
-            selectedId={selectedRun}
-            onSelect={setSelectedRun}
-          />
-          <div>
-            {run.isLoading ? <p>Loading run…</p> : null}
-            {run.data ? <RunDetailView run={run.data} /> : null}
+        {tab === "timeline" ? (
+          <Panel title="Timeline">
+            <Timeline entries={timeline.data ?? []} />
+          </Panel>
+        ) : null}
+
+        {tab === "runs" ? (
+          <div className="grid items-start gap-5 lg:grid-cols-[280px_1fr]">
+            <Panel title="Runs" bodyClassName="p-2">
+              <RunList
+                runs={runs.data ?? []}
+                selectedId={selectedRun}
+                onSelect={setSelectedRun}
+              />
+            </Panel>
+            <Panel title="Run trace">
+              {run.isLoading ? <EmptyState>Loading run…</EmptyState> : null}
+              {run.data ? <RunDetailView run={run.data} /> : null}
+              {!run.isLoading && !run.data ? (
+                <EmptyState>Select a run to see its agent trace.</EmptyState>
+              ) : null}
+            </Panel>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {tab === "evidence" ? (
-        <EvidenceList evidence={evidence.data ?? []} />
-      ) : null}
+        {tab === "evidence" ? (
+          <Panel title="Evidence">
+            <EvidenceList evidence={evidence.data ?? []} />
+          </Panel>
+        ) : null}
 
-      {tab === "hypotheses" ? (
-        <HypothesisList hypotheses={hypotheses.data ?? []} />
-      ) : null}
+        {tab === "hypotheses" ? (
+          <Panel title="Hypotheses">
+            <HypothesisList hypotheses={hypotheses.data ?? []} />
+          </Panel>
+        ) : null}
 
-      {tab === "usage" ? (
-        <>
-          {usage.isLoading ? <p>Loading usage…</p> : null}
-          {usage.data ? <TokenUsagePanel usage={usage.data} /> : null}
-        </>
-      ) : null}
-      
-    </main>
+        {tab === "usage" ? (
+          <Panel title="Token usage">
+            {usage.isLoading ? <EmptyState>Loading usage…</EmptyState> : null}
+            {usage.data ? <TokenUsagePanel usage={usage.data} /> : null}
+          </Panel>
+        ) : null}
+      </div>
+    </>
   );
 }

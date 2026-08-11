@@ -1,17 +1,42 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Mapping
 
-from pydantic import BaseModel, HttpUrl, PostgresDsn, RedisDsn, SecretStr
+from pydantic import (
+    BaseModel,
+    HttpUrl,
+    PostgresDsn,
+    RedisDsn,
+    SecretStr,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_PROVIDER_TIMEOUT_SECONDS = 45
+DEFAULT_LLM_TIMEOUT_SECONDS = 45
+
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_REQUEST_ID_HEADER = "X-Request-Id"
 
 DEFAULT_FAST_MODEL = "openai/gpt-oss-20b:free"
 DEFAULT_REASONING_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+
+
+INHERIT_TIER = ""
+
+ROLE_TIERS: Mapping[str, str] = {
+    "default": "fast",
+    "scribe": "fast",
+    "trigger": "fast",
+    "planner": "fast",
+    "hypothesis": "reasoning",
+    "critic": "reasoning",
+    "summarizer": "reasoning",
+    "mitigation": "reasoning",
+    "comms": "reasoning",
+    "postmortem": "reasoning",
+}
+
 
 class SlackSettings(BaseModel):
     signing_secret: SecretStr
@@ -19,30 +44,48 @@ class SlackSettings(BaseModel):
     client_secret: SecretStr
     bot_token: SecretStr
 
+
 class LLMProviderSettings(BaseModel):
-    api_key: SecretStr
     base_url: HttpUrl = HttpUrl(OPENROUTER_BASE_URL)
-    timeout_seconds: int = DEFAULT_PROVIDER_TIMEOUT_SECONDS
+    api_key: SecretStr | None = None
+    timeout_seconds: int = DEFAULT_LLM_TIMEOUT_SECONDS
     request_id_header: str | None = OPENROUTER_REQUEST_ID_HEADER
     headers: dict[str, str] = {}
+    max_capability_downgrades: int = 4
+
 
 class LLMModelSettings(BaseModel):
-    scribe: str = DEFAULT_FAST_MODEL
-    trigger: str = DEFAULT_FAST_MODEL
-    default: str = DEFAULT_FAST_MODEL
-    hypothesis: str = DEFAULT_REASONING_MODEL
-    critic: str = DEFAULT_REASONING_MODEL
-    summarizer: str = DEFAULT_REASONING_MODEL
-    planner: str = DEFAULT_FAST_MODEL
-    mitigation: str = DEFAULT_REASONING_MODEL
-    comms: str = DEFAULT_REASONING_MODEL
-    postmortem: str = DEFAULT_REASONING_MODEL
+    fast: str = INHERIT_TIER
+    reasoning: str = INHERIT_TIER
+
+    default: str = INHERIT_TIER
+    scribe: str = INHERIT_TIER
+    trigger: str = INHERIT_TIER
+    planner: str = INHERIT_TIER
+    hypothesis: str = INHERIT_TIER
+    critic: str = INHERIT_TIER
+    summarizer: str = INHERIT_TIER
+    mitigation: str = INHERIT_TIER
+    comms: str = INHERIT_TIER
+    postmortem: str = INHERIT_TIER
+
+    def resolved(self) -> LLMModelSettings:
+        fast = self.fast or DEFAULT_FAST_MODEL
+        reasoning = self.reasoning or self.fast or DEFAULT_REASONING_MODEL
+        tiers = {"fast": fast, "reasoning": reasoning}
+        roles = {
+            role: getattr(self, role) or tiers[tier]
+            for role, tier in ROLE_TIERS.items()
+        }
+        return LLMModelSettings(fast=fast, reasoning=reasoning, **roles)
+
 
 class LangfuseSettings(BaseModel):
     enabled: bool = False
     host: HttpUrl | None = None
     public_key: SecretStr | None = None
-    seceret_key: SeceretStr | None = None
+    secret_key: SecretStr | None = None
+
 
 class LLMRateLimitSettings(BaseModel):
     max_retries: int = 3
@@ -57,9 +100,8 @@ class LLMSettings(BaseModel):
     max_repair_attempts: int = 1
     rate_limit: LLMRateLimitSettings = LLMRateLimitSettings()
 
-class RunBudgetSettings(BaseModel):
-    """Per-run investigation budget."""
 
+class RunBudgetSettings(BaseModel):
     max_tokens: int = 120_000
     max_tool_calls: int = 40
     max_wall_clock_s: int = 90
@@ -73,47 +115,35 @@ class IncidentBudgetSettings(BaseModel):
 
 
 class ToolBrokerSettings(BaseModel):
-    """Tool Broker cache + rate-limit tunables."""
-
     cache_ttl_s: int = 60
     rate_limit_per_min: int = 60
     call_timeout_s: int = 15
 
 
 class PrometheusSettings(BaseModel):
-    """Prometheus read endpoint."""
-
     base_url: str = "http://localhost:9090"
     query_set: Literal["default", "prometheus_self"] = "default"
     queries: dict[str, str] = {}
 
 
 class LokiSettings(BaseModel):
-    """Loki read endpoint."""
-
     base_url: str = "http://localhost:3100"
     service_label: str = "service"
 
 
 class GitHubSettings(BaseModel):
-    """GitHub read access for deploys + code"""
-
     api_url: str = "https://api.github.com"
     repo: str | None = None
     token: SecretStr | None = None
 
 
 class UnleashSettings(BaseModel):
-    """Unleash feature-flag read access"""
-
     base_url: str = "http://localhost:4242"
     token: SecretStr | None = None
     project: str = "default"
 
 
 class ToolsSettings(BaseModel):
-    """Which provider backs the tool catalogue, and how to reach it"""
-
     provider: Literal["synthetic", "real"] = "synthetic"
     http_timeout_s: float = 5.0
     max_response_bytes: int = 2_000_000
@@ -122,32 +152,27 @@ class ToolsSettings(BaseModel):
     github: GitHubSettings = GitHubSettings()
     unleash: UnleashSettings = UnleashSettings()
 
-class AdaptiveSettings(BaseModel):
-    """Trigger scoring + debounce/coalesce tunables"""
 
+class AdaptiveSettings(BaseModel):
     trigger_threshold: float = 0.5
     batch_threshold: float = 0.2
     coalesce_window_s: int = 30
     pending_ttl_s: int = 600
     max_coalesced_signals: int = 50
 
-class MitigationSettings(BaseModel):
-    """Mitigation proposals + the approval gate"""
 
+class MitigationSettings(BaseModel):
     enabled: bool = True
     max_options: int = 3
 
-class ActiveModeSettings(BaseModel):
-    """Active-mode periodic refresh."""
 
+class ActiveModeSettings(BaseModel):
     refresh_interval_s: int = 300
     min_refresh_interval_s: int = 60
     agents: tuple[str, ...] = ("telemetry", "impact")
 
 
 class RecoverySettings(BaseModel):
-    """RecoveryWatcher polling + the recovered/not-recovered rule."""
-
     poll_interval_s: int = 60
     max_polls: int = 20
     metric: str = "p99_ms"
@@ -156,17 +181,23 @@ class RecoverySettings(BaseModel):
     degraded_ratio: float = 2.0
     default_service: str = "checkout-api"
 
-class GovernorSettings(BaseModel):
-    """Anti-spam governor budget + dedup tunables"""
 
+class GovernorSettings(BaseModel):
     post_budget: int = 6
     post_window_s: int = 900
     dedup_ttl_s: int = 1800
     dedup_similarity: float = 0.85
     dedup_history: int = 20
 
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", env_nested_delimiter="__", case_sensitive=False, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     database_url: PostgresDsn
     redis_url: RedisDsn
@@ -181,6 +212,19 @@ class Settings(BaseSettings):
     adaptive: AdaptiveSettings = AdaptiveSettings()
     governor: GovernorSettings = GovernorSettings()
     mitigation: MitigationSettings = MitigationSettings()
+    active: ActiveModeSettings = ActiveModeSettings()
+    recovery: RecoverySettings = RecoverySettings()
+
+    @model_validator(mode="after")
+    def _resolve_llm(self) -> Settings:
+        if self.llm.provider.api_key is None:
+            raise ValueError(
+                "llm.provider.api_key is required (set LLM__PROVIDER__API_KEY — "
+                "get one at https://openrouter.ai/keys)"
+            )
+        self.llm.models = self.llm.models.resolved()
+        return self
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

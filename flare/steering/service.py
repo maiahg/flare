@@ -29,7 +29,8 @@ from flare.models.claims import (
     PostmortemDraft,
     TimelineEntry,
 )
-from flare.models.core import INCIDENT_MODES, Incident, User, Workspace
+from flare.models.core import ACTIVE_MODE, INCIDENT_MODES, Incident, User, Workspace
+from flare.models.provenance import HUMAN_STATEMENT_KIND
 from flare.postmortem import generate_postmortem
 from flare.steering.actors import Actor
 from flare.steering.errors import NotFoundError, ValidationError
@@ -45,8 +46,6 @@ HUMAN_CONFIDENCE = 1.0
 
 #: How many existing claims a correction is reconciled against.
 CORRECTION_CANDIDATES = 25
-
-ACTIVE_MODE = "active"
 
 _logger = logging.getLogger("flare.steering")
 
@@ -336,7 +335,7 @@ class SteeringService:
         return await self._repo.create(
             ActionItem,
             incident_id=incident.id,
-            kind=HUMAN_KIND,
+            kind=HUMAN_STATEMENT_KIND,
             confidence=HUMAN_CONFIDENCE,
             source=self._source(),
             created_by=self._actor.ref,
@@ -400,7 +399,7 @@ class SteeringService:
         fact = await self._repo.create(
             Fact,
             incident_id=incident.id,
-            kind=HUMAN_KIND,
+            kind=HUMAN_STATEMENT_KIND,
             confidence=HUMAN_CONFIDENCE,
             source=self._source(
                 correction=True,

@@ -18,7 +18,9 @@ CLAIM_STATUSES = ("active", "rejected", "stale", "superseded", "resolved")
 DEFAULT_CLAIM_STATUS = "active"
 
 # Envelope ``kind`` classification.
-CLAIM_KINDS = ("fact", "hypothesis", "inference", "human_statement")
+HUMAN_STATEMENT_KIND = "human_statement"
+INFERENCE_KIND = "inference"
+CLAIM_KINDS = ("fact", "hypothesis", INFERENCE_KIND, HUMAN_STATEMENT_KIND)
 
 
 class ProvenanceMixin:

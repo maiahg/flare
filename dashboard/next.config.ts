@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
         source: "/api/:path((?!.*/stream$).*)",
         destination: `${backend}/api/:path`,
       },
+      { source: "/readyz", destination: `${backend}/readyz` },
     ];
   },
 };
