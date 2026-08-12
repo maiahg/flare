@@ -45,20 +45,41 @@ async def _combine_with_superseded(
     return trigger
 
 
+_EXPLICIT_REASONS = frozenset(
+    {"flare_investigate", "flare_validate", "manual_investigate"}
+)
+
+
+def _is_explicit_ask(trigger: dict[str, Any]) -> bool:
+    reason = str(trigger.get("reason") or "")
+    return reason in _EXPLICIT_REASONS or "command" in trigger
+
+
 async def _build_poster(
-    incident_id: uuid.UUID, channel: str | None, mode: str
+    incident_id: uuid.UUID, channel: str | None, mode: str, *, force: bool = False
 ) -> tuple[InvestigationPoster | None, InvestigationSlackPoster | None]:
-    """A mode-gated, governor-wrapped poster, or None when we can't post."""
+    """A mode-gated, governor-wrapped poster, or None when we can't post.
+
+    When ``force`` is set (an explicit human ask), the poster answers regardless
+    of mode and bypasses the governor — the human is owed a direct reply.
+    """
     if not channel:
         return None, None
     settings = get_settings()
     try:
         inner = InvestigationSlackPoster(
-            SlackPoster(), channel=channel, incident_id=incident_id, mode=mode
+            SlackPoster(),
+            channel=channel,
+            incident_id=incident_id,
+            mode=mode,
+            force=force,
         )
     except Exception: 
         _logger.warning("no Slack poster; running without channel posts")
         return None, None
+
+    if force:
+        return inner, inner
 
     governor = AntiSpamGovernor(
         get_redis(), incident_id=incident_id, mode=mode, settings=settings.governor
@@ -110,7 +131,9 @@ async def run_adaptive_investigation(ctx: dict, payload: dict[str, Any]) -> str:
         channel = incident.slack_channel_id if incident else None
         mode = incident.mode if incident else "assist"
 
-    poster, approval_poster = await _build_poster(incident_id, channel, mode)
+    poster, approval_poster = await _build_poster(
+        incident_id, channel, mode, force=_is_explicit_ask(trigger)
+    )
     run_id = await start_adaptive_run(
         incident_id,
         trigger=trigger,

@@ -15,13 +15,18 @@ from flare.events.outbox import commit_and_publish
 from flare.llm import get_llm_client
 from flare.memory import MemoryRepository
 from flare.models.claims import Decision, Fact, OpenQuestion, TimelineEntry
+from flare.models.core import Incident
 from flare.models.ingestion import SlackMessage
 from flare.models.provenance import HUMAN_STATEMENT_KIND
+from flare.slack.posting import can_post_proactively
 from flare.pipeline.mapping import plan_claims
 from flare.pipeline.triage import triage_message
 from flare.worker.enqueue import enqueue_adaptive_run
 
 _logger = logging.getLogger("flare.pipeline")
+
+_TERMINAL_STATUSES = frozenset({"resolved", "closed"})
+
 
 class _Envelope(TypedDict):
     incident_id: uuid.UUID
@@ -50,6 +55,10 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
             if existing is not None:
                 _logger.info("duplicate slack_ts %s ignored", slack_ts)
                 return "duplicate"
+
+        incident = await session.get(Incident, incident_id)
+        mode = incident.mode if incident is not None else "quiet"
+        status = incident.status if incident is not None else "open"
 
         # ---- Scribe: persist message + signals
         scribe = ScribeAgent(get_llm_client())
@@ -114,7 +123,10 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
         # ---- commit, THEN publish the queued SSE events
         await commit_and_publish(session)
 
-    if triage.opened_window:
+    may_auto_investigate = (
+        can_post_proactively(mode) and status not in _TERMINAL_STATUSES
+    )
+    if triage.opened_window and may_auto_investigate:
         await enqueue_adaptive_run(
             {"incident_id": str(incident_id), "created_by": "adaptive"},
             defer_by=get_settings().adaptive.coalesce_window_s,

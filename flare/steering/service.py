@@ -61,6 +61,9 @@ _STATUS_TIMESTAMPS: dict[str, str] = {
     "closed": "closed_at",
 }
 
+#: Statuses after which the agent stops all self-directed background work.
+_TERMINAL_STATUSES = frozenset({"resolved", "closed"})
+
 _logger = logging.getLogger("flare.steering")
 
 
@@ -179,7 +182,7 @@ class SteeringService:
             title=title.strip(),
             description=description,
             status="open",
-            mode="assist",
+            mode="quiet",
             started_at=datetime.now(UTC),
             alert_payload=dict(alert_payload) if alert_payload else None,
             source={"type": "human", "surface": self._actor.surface},
@@ -235,6 +238,9 @@ class SteeringService:
             after={"status": status},
             action=f"set status to {status}",
         )
+        if status in _TERMINAL_STATUSES:
+            incident_id = incident.id
+            self.defer(lambda: _quiet(stop_active_loop(incident_id)))
         return incident
 
     async def _schedule_active_mode(self, incident: Incident, mode: str) -> None:

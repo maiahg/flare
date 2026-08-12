@@ -25,12 +25,17 @@ from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.pipeline.active")
 
-async def _incident_state(incident_id: uuid.UUID) -> tuple[str, str | None] | None:
+_TERMINAL_STATUSES = frozenset({"resolved", "closed"})
+
+
+async def _incident_state(
+    incident_id: uuid.UUID,
+) -> tuple[str, str | None, str] | None:
     async with get_sessionmaker()() as session:
         incident = await session.get(Incident, incident_id)
         if incident is None:
             return None
-        return incident.mode, incident.slack_channel_id
+        return incident.mode, incident.slack_channel_id, incident.status
 
 
 def _dashboard_url(incident_id: uuid.UUID) -> str:
@@ -39,13 +44,17 @@ def _dashboard_url(incident_id: uuid.UUID) -> str:
 
 
 def _slack_poster(
-    incident_id: uuid.UUID, channel: str | None, mode: str
+    incident_id: uuid.UUID, channel: str | None, mode: str, *, force: bool = False
 ) -> InvestigationSlackPoster | None:
     if not channel:
         return None
     try:
         return InvestigationSlackPoster(
-            SlackPoster(), channel=channel, incident_id=incident_id, mode=mode
+            SlackPoster(),
+            channel=channel,
+            incident_id=incident_id,
+            mode=mode,
+            force=force,
         )
     except Exception:
         _logger.warning("no Slack poster; running without channel posts")
@@ -80,7 +89,11 @@ async def active_refresh(ctx: dict, payload: dict[str, Any]) -> str:
     state = await _incident_state(incident_id)
     if state is None:
         return "no_incident"
-    mode, channel = state
+    mode, channel, status = state
+    if status in _TERMINAL_STATUSES:
+        # The incident is resolved/closed — stop the loop and stop working.
+        _logger.info("active loop stopping: incident is %s", status)
+        return "stopped"
     if not manual:
         if mode != ACTIVE_MODE:
             _logger.info("active loop stopping: mode is %s", mode)
@@ -89,7 +102,13 @@ async def active_refresh(ctx: dict, payload: dict[str, Any]) -> str:
             _logger.info("active loop stopping: token replaced or expired")
             return "superseded"
 
-    poster = await _governed(incident_id, channel, mode)
+    # A manual `/flare refresh` is an explicit ask: answer in-channel regardless
+    # of mode. The scheduled loop stays governed so active mode isn't chatty.
+    poster = (
+        _slack_poster(incident_id, channel, mode, force=True)
+        if manual
+        else await _governed(incident_id, channel, mode)
+    )
     try:
         run_id = await start_adaptive_run(
             incident_id,
@@ -143,7 +162,10 @@ async def recovery_watch(ctx: dict, payload: dict[str, Any]) -> str:
     state = await _incident_state(incident_id)
     if state is None:
         return "no_incident"
-    mode, channel = state
+    mode, channel, status = state
+    if status in _TERMINAL_STATUSES:
+        _logger.info("recovery watch stopping: incident is %s", status)
+        return "stopped"
 
     scenario = str(payload.get("scenario", DEFAULT_SCENARIO))
     async with get_sessionmaker()() as session:

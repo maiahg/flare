@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { EvidenceList, HypothesisList } from "@/components/ClaimLists";
 import { IncidentOverview } from "@/components/IncidentOverview";
+import { PostmortemView } from "@/components/Postmortem";
 import { RunDetailView, RunList } from "@/components/RunTrace";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { INCIDENT_TABS, type IncidentTab } from "@/components/shell/Sidebar";
@@ -18,6 +19,7 @@ import {
   useEvidence,
   useHypotheses,
   useIncident,
+  usePostmortem,
   useRun,
   useRuns,
   useTimeline,
@@ -59,6 +61,7 @@ function IncidentView({ id }: { id: string }) {
   const evidence = useEvidence(id);
   const hypotheses = useHypotheses(id);
   const usage = useUsage(id);
+  const postmortem = usePostmortem(id);
 
   // Default to the most recent run once the list loads.
   useEffect(() => {
@@ -161,6 +164,16 @@ function IncidentView({ id }: { id: string }) {
         {tab === "hypotheses" ? (
           <Panel title="Hypotheses">
             <HypothesisList hypotheses={hypotheses.data ?? []} />
+          </Panel>
+        ) : null}
+
+        {tab === "postmortem" ? (
+          <Panel title="Postmortem">
+            {postmortem.isLoading ? (
+              <EmptyState>Loading postmortem…</EmptyState>
+            ) : (
+              <PostmortemView postmortem={postmortem.data ?? null} />
+            )}
           </Panel>
         ) : null}
 

@@ -80,14 +80,13 @@ async def adopt_or_create_incident(
             title=title,
             description=description,
             severity=severity,
-            mode="assist",
+            mode="quiet",
             status="open",
             started_at=datetime.now(UTC),
             created_by=created_by,
         )
         session.add(incident)
     else:
-        incident.mode = "assist"
         if title:
             incident.title = title
     await session.commit()

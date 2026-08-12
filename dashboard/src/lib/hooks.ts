@@ -12,6 +12,7 @@ export const incidentKeys = {
   evidence: (id: string) => ["incident", id, "evidence"] as const,
   hypotheses: (id: string) => ["incident", id, "hypotheses"] as const,
   usage: (id: string) => ["incident", id, "usage"] as const,
+  postmortem: (id: string) => ["incident", id, "postmortem"] as const,
 };
 
 export function useIncidents(status?: string) {
@@ -160,6 +161,22 @@ export function useUsage(id: string) {
         { params: { path: { incident_id: id } } },
       );
       if (error) throw new Error("failed to load token usage");
+      return data;
+    },
+  });
+}
+
+export function usePostmortem(id: string) {
+  return useQuery({
+    queryKey: incidentKeys.postmortem(id),
+    queryFn: async () => {
+      const { data, error, response } = await api.GET(
+        "/api/v1/incidents/{incident_id}/postmortem",
+        { params: { path: { incident_id: id } } },
+      );
+      // No draft yet is the normal empty state, not an error.
+      if (response.status === 404) return null;
+      if (error) throw new Error("failed to load postmortem");
       return data;
     },
   });

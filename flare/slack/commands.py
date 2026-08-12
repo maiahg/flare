@@ -6,7 +6,6 @@ from typing import Any
 from flare.approvals import mitigation_view
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
-from flare.llm import get_llm_client
 from flare.models.claims import COMMS_AUDIENCES, TimelineEntry
 from flare.models.core import (
     INCIDENT_MODES,
@@ -23,13 +22,14 @@ from flare.slack.incident_ops import (
 )
 from flare.slack.modals import SlackModals, loading_view
 from flare.slack.posting import SlackPoster, post_incident_card
-from flare.steering import SteeringError, SteeringService, slack_actor
+from flare.steering import SteeringService, slack_actor
 from flare.worker.enqueue import (
     enqueue_active_refresh as enqueue_refresh,
 )
 from flare.worker.enqueue import (
     enqueue_adaptive_run,
     enqueue_comms_draft,
+    enqueue_correction,
     enqueue_initial_run,
     enqueue_postmortem,
 )
@@ -280,7 +280,6 @@ async def _handle_status(
 async def _handle_correct(
     args: list[str], *, channel_id: str, team_id: str, user_id: str | None
 ) -> dict[str, Any]:
-    """`/flare correct "…"` — a human correction, reconciled by Scribe."""
     text = " ".join(args).strip().strip('"').strip("'")
     if not text:
         return _ephemeral('Usage: `/flare correct "what is actually true"`')
@@ -288,18 +287,13 @@ async def _handle_correct(
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
             return _ephemeral("No flare incident is tracking this channel.")
-        service = SteeringService(
-            session, slack_actor(user_id or "unknown"), llm=get_llm_client()
-        )
-        try:
-            outcome = await service.submit_correction(incident, correction_text=text)
-        except SteeringError as exc:
-            await session.rollback()
-            return _ephemeral(f":warning: {exc}")
-        await service.commit()
-        count = len(outcome.invalidated)
-    suffix = f" {count} claim(s) rejected." if count else ""
-    return _ephemeral(f":pencil: Correction recorded.{suffix}")
+        incident_id = incident.id
+    await enqueue_correction(
+        {"incident_id": str(incident_id), "text": text, "user_id": user_id}
+    )
+    return _ephemeral(
+        ":pencil: Correction recorded — reconciling memory against it now."
+    )
 
 async def _handle_mitigation(
     *, channel_id: str, team_id: str, user_id: str | None
@@ -396,7 +390,7 @@ async def _handle_draft_update(
         }
     )
     if view_id:
-        return {"response_type": "ephemeral", "text": ""}
+        return {}
     return _ephemeral(
         f"Drafting the *{audience}* update — it will appear at "
         f"{_dashboard_url(incident_id)}. Flare never sends it for you."

@@ -65,6 +65,8 @@ async def handle_interaction(
     """Dispatch one Slack interaction. Returns the ACK body (for tests + logs)."""
     if payload.get("type") == "view_submission":
         return await handle_view_submission(payload)
+    if payload.get("type") == "view_closed":
+        return {"ok": True, "status": "closed"}
     if payload.get("type") != "block_actions":
         return {"ok": True, "status": "ignored"}
 

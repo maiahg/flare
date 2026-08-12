@@ -165,7 +165,12 @@ payments-gateway) points squarely at #7788.
 ```
 priya:  /flare start "Orders stuck in pending — checkout success dropping" --sev sev1 --desc order confirmations backing up since ~02:16 UTC
 ```
-→ bot posts the incident card and immediately starts a read-only investigation.
+→ bot posts the incident card and **silently** starts a read-only investigation.
+By default an incident is in **quiet** mode: the agent investigates and writes to
+memory/dashboard but does not post findings or mitigations to the channel unless
+you ask (a read command, `/flare investigate|validate`, or `/flare mode assist`
+to turn on proactive posting). Nothing happens without a command — inviting the
+bot to a channel no longer opens an incident on its own.
 
 **Beat 2 — The team piles in with context** (each line becomes a cited fact /
 timeline entry, and can trigger a re-investigation):
@@ -176,7 +181,8 @@ omar:  I also shipped #7788 to orders-worker at 02:14 — a redis-rb 5.0 upgrade
 lin:   payments-gateway had a p99 blip at 01:58 but it was normal again by 02:02. I don't think payments is involved.
 ```
 
-**Beat 3 — Ask the bot what it found**
+**Beat 3 — Ask the bot what it found** (in quiet mode this is how findings
+surface — the reads are ephemeral, the dashboard has the full picture):
 ```
 priya:  /flare hypotheses
 priya:  /flare evidence

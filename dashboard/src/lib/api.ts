@@ -22,3 +22,4 @@ export type ToolCall = components["schemas"]["ToolCallRead"];
 export type Evidence = components["schemas"]["EvidenceRead"];
 export type Hypothesis = components["schemas"]["HypothesisRead"];
 export type IncidentUsage = components["schemas"]["IncidentUsage"];
+export type Postmortem = components["schemas"]["PostmortemDraftRead"];

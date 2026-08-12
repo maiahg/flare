@@ -9,6 +9,7 @@ import {
   AlertIcon,
   BulbIcon,
   ClockIcon,
+  DocumentIcon,
   EvidenceIcon,
   GridIcon,
   RunsIcon,
@@ -22,6 +23,7 @@ export const INCIDENT_TABS = [
   ["runs", "Runs", RunsIcon],
   ["evidence", "Evidence", EvidenceIcon],
   ["hypotheses", "Hypotheses", BulbIcon],
+  ["postmortem", "Postmortem", DocumentIcon],
   ["usage", "Tokens", TokenIcon],
 ] as const;
 

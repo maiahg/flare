@@ -71,15 +71,20 @@ class InvestigationSlackPoster:
         incident_id: uuid.UUID,
         mode: str,
         thread_ts: str | None = None,
+        force: bool = False,
     ) -> None:
         self._poster = poster
         self._channel = channel
         self._incident_id = incident_id
         self._mode = mode
         self._thread_ts = thread_ts
+        self._force = force
+
+    def _may_post(self) -> bool:
+        return self._force or can_post_proactively(self._mode)
 
     async def post_intent(self, checking: list[str]) -> None:
-        if not can_post_proactively(self._mode):
+        if not self._may_post():
             return
         text = f":mag: Checking {', '.join(checking)}…"
         await self._poster.post_message(
@@ -90,7 +95,7 @@ class InvestigationSlackPoster:
     async def post_findings(
         self, *, summary: str | None, top_hypothesis: str | None, dashboard_url: str
     ) -> None:
-        if not can_post_proactively(self._mode):
+        if not self._may_post():
             return
         lines = [":clipboard: *Findings*"]
         if summary:
@@ -107,14 +112,14 @@ class InvestigationSlackPoster:
         self, *, blocks: list[dict[str, Any]], text: str
     ) -> None:
         """Post an approval card"""
-        if not can_post_proactively(self._mode):
+        if not self._may_post():
             return
         await self._poster.post_message(self._channel, text, blocks=blocks)
         await self._announce("approval")
 
     async def post_raw(self, text: str) -> None:
         """Post an already-composed line"""
-        if not can_post_proactively(self._mode):
+        if not self._may_post():
             return
         await self._poster.post_message(self._channel, text, thread_ts=self._thread_ts)
         await self._announce("nudge")
