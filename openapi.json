@@ -1621,6 +1621,76 @@
         }
       }
     },
+    "/api/v1/incidents/{incident_id}/status": {
+      "post": {
+        "tags": [
+          "steering"
+        ],
+        "summary": "Set Status",
+        "description": "Move the incident status: open | mitigating | monitoring | resolved | closed.",
+        "operationId": "set_status_api_v1_incidents__incident_id__status_post",
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "X-Flare-Actor",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Flare-Actor"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/incidents/{incident_id}/investigate": {
       "post": {
         "tags": [
@@ -5669,6 +5739,20 @@
         ],
         "title": "RunTokenUsage",
         "description": "Per-run usage \u2014 the row the \u00a76.4 run detail shows."
+      },
+      "StatusUpdate": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "StatusUpdate"
       },
       "SummaryRead": {
         "properties": {

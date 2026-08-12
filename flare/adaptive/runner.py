@@ -33,6 +33,7 @@ from flare.investigation.state import RunState
 from flare.llm import get_llm_client
 from flare.models.claims import Hypothesis
 from flare.redis import get_redis
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.adaptive")
 
@@ -78,7 +79,7 @@ async def start_adaptive_run(
     *,
     trigger: dict[str, Any] | None = None,
     created_by: str = "system",
-    scenario: str = "db_latency_spike",
+    scenario: str = DEFAULT_SCENARIO,
     poster: InvestigationPoster | None = None,
     approval_poster: ApprovalPoster | None = None,
     dashboard_url: str = "",

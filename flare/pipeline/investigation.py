@@ -8,6 +8,7 @@ from flare.db.session import get_sessionmaker
 from flare.investigation import start_initial_run
 from flare.models.core import Incident
 from flare.slack.posting import InvestigationSlackPoster, SlackPoster
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.pipeline.investigation")
 
@@ -37,7 +38,7 @@ async def run_initial_investigation(ctx: dict, payload: dict[str, Any]) -> str:
         incident_id,
         trigger=payload.get("trigger", {}),
         created_by=payload.get("created_by", "system"),
-        scenario=payload.get("scenario", "db_latency_spike"),
+        scenario=payload.get("scenario", DEFAULT_SCENARIO),
         poster=poster,
         approval_poster=poster,
     )

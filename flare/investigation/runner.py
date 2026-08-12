@@ -19,6 +19,7 @@ from flare.investigation.recorder import BrokerFactory, RunRecorder
 from flare.investigation.resume import capture_interrupt
 from flare.investigation.state import RunState
 from flare.llm import get_llm_client
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.investigation")
 
@@ -28,7 +29,7 @@ async def start_initial_run(
     *,
     trigger: dict[str, Any] | None = None,
     created_by: str = "system",
-    scenario: str = "db_latency_spike",
+    scenario: str = DEFAULT_SCENARIO,
     poster: InvestigationPoster | None = None,
     approval_poster: ApprovalPoster | None = None,
     dashboard_url: str = "",

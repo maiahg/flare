@@ -16,6 +16,7 @@ from flare.models.core import Incident
 from flare.models.tracing import InvestigationRun
 from flare.redis import get_redis
 from flare.slack.posting import InvestigationSlackPoster, SlackPoster
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.pipeline.adaptive")
 
@@ -114,7 +115,7 @@ async def run_adaptive_investigation(ctx: dict, payload: dict[str, Any]) -> str:
         incident_id,
         trigger=trigger,
         created_by=payload.get("created_by", "adaptive"),
-        scenario=payload.get("scenario", "db_latency_spike"),
+        scenario=payload.get("scenario", DEFAULT_SCENARIO),
         poster=poster,
         approval_poster=approval_poster,
     )

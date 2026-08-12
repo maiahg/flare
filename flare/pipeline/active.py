@@ -20,6 +20,7 @@ from flare.investigation.graph import InvestigationPoster
 from flare.models.core import ACTIVE_MODE, Incident
 from flare.redis import get_redis
 from flare.slack.posting import InvestigationSlackPoster, SlackPoster
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.pipeline.active")
 
@@ -157,7 +158,7 @@ async def recovery_watch(ctx: dict, payload: dict[str, Any]) -> str:
         redis=get_redis(),
         settings=settings.recovery,
         service=service,
-        scenario=str(payload.get("scenario", "db_latency_spike")),
+        scenario=str(payload.get("scenario", DEFAULT_SCENARIO)),
     )
     assessment = await watcher.poll()
 

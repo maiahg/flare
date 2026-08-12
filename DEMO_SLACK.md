@@ -27,8 +27,17 @@ Slack must reach the backend over HTTPS → run a tunnel (cloudflared/ngrok) to 
 ## Part A — local stack
 
 1. Get an OpenRouter key: https://openrouter.ai/keys (default models are free tiers).
-2. `make up` then `podman ps` (wait for postgres + redis healthy). The `real`
-   profile (Prometheus/Loki/Unleash) is NOT needed — tools run in `synthetic` mode.
+2. Bring up a **clean** Postgres + Redis (the `-v` wipes any stale volume from
+   earlier work so the schema matches the current migrations):
+   ```
+   podman compose down -v && make up
+   podman ps            # wait for flare-postgres + flare-redis healthy
+   podman port flare-postgres   # confirm 5432/tcp -> 0.0.0.0:5433
+   ```
+   The `real` profile (Prometheus/Loki/Unleash) is NOT needed — synthetic mode.
+   If you skip the reset and the **worker later crashes with**
+   `column "provider_request_id" ... does not exist`, your volume is stale:
+   `podman compose down -v && make up` then re-run migrations (step 4).
 3. `cp .env.example .env`, then set:
    ```
    DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5433/vectordb
@@ -107,26 +116,139 @@ settings:
     request_url: https://TUNNEL_URL/slack/interactions
 ```
 
+## Reset between demos
+
+To start each demo from a clean slate (no incidents, hypotheses, evidence, runs,
+etc.) **without** having to re-install the Slack app, wipe just the incident data
+and flush Redis:
+
+```
+# Wipes every incident-scoped table (cascades from `incidents`); KEEPS the
+# `workspaces` + `users` rows, so the Slack install / OAuth still works.
+podman exec flare-postgres psql -U postgres -d vectordb -c "TRUNCATE incidents CASCADE;"
+
+# Clears ephemeral state: Slack event-dedupe keys, recovery tokens, rate-limiter
+# counters, the arq job queue, and any open SSE bookkeeping.
+podman exec flare-redis redis-cli FLUSHALL
+```
+
+Then reload the dashboard — the incident list is empty and you can `/flare start`
+a fresh one. Restarting the backend/worker is not required.
+
+> **Nuclear option** (also resets migrations and *removes* the workspace install,
+> so you must re-run step 4 + re-OAuth in Part B):
+> `podman compose down -v && make up && uv run --frozen alembic upgrade head`
+
 ## Part C — demo script (in Slack)
 
-1. Create `#inc-checkout`, then `/invite @flare`.
-2. `/flare start "Checkout latency spike" --sev sev2 --desc p99 climbing on checkout-api`
-   → bot posts the incident card; worker investigates the synthetic
-   `db_latency_spike` scenario and posts findings.
-3. Type context in-channel (becomes facts/timeline, can trigger re-investigation):
-   - `We deployed checkout-api v423 at 14:05`
-   - `Error rate started climbing right after`
-4. Reads: `/flare hypotheses`, `/flare evidence`, `/flare timeline`, `/flare brief`
-5. `/flare mitigation` → proposes ranked options with Approve/Reject buttons
-   (human-in-the-loop; nothing mutating happens without a click).
-6. Confirm/reject a hypothesis via its buttons (drives ranking).
-7. `/flare draft-update status` → opens an editable comms modal (audiences:
-   internal | support | status | exec).
-8. `/flare mode active` (proactive refresh + recovery watch), `/flare postmortem`.
-9. Dashboard: open http://localhost:3000 for the live incident view.
+The worker investigates the synthetic **`orders_backlog`** scenario: an
+orders-worker queue backing up after deploy **#7788** (a redis-rb 5.0 upgrade
+that quietly shrank the connection pool 25→5). It ships with **two decoys** the
+team will argue over — a co-timed feature-flag ramp (`async_order_confirmation`,
+reinforced by a real past incident) and a cosmetic web-storefront deploy — while
+the evidence (pool-exhaustion logs, blame on `redis.rb`, a healthy
+payments-gateway) points squarely at #7788.
+
+**Cast** — invite these people (or use a few test accounts and post as each):
+
+| Handle | Role |
+|---|---|
+| `@priya` | Incident Commander — runs every `/flare` command |
+| `@sam` | SRE watching the dashboards |
+| `@omar` | orders-team — shipped deploy #7788 |
+| `@rey` | product — owns the `async_order_confirmation` flag |
+| `@lin` | payments on-call |
+
+**Setup:** create `#inc-orders-backlog`, then `/invite @flare`.
+
+**Beat 1 — Declare the incident**
+```
+priya:  /flare start "Orders stuck in pending — checkout success dropping" --sev sev1 --desc order confirmations backing up since ~02:16 UTC
+```
+→ bot posts the incident card and immediately starts a read-only investigation.
+
+**Beat 2 — The team piles in with context** (each line becomes a cited fact /
+timeline entry, and can trigger a re-investigation):
+```
+sam:   Order success on the checkout dashboard fell 99.3% → 71% starting 02:16. Customers see a "pending" spinner.
+rey:   Heads up — I ramped async_order_confirmation 0 → 100 at 02:15. Could be us. Want me to roll it back?
+omar:  I also shipped #7788 to orders-worker at 02:14 — a redis-rb 5.0 upgrade. Timing lines up too.
+lin:   payments-gateway had a p99 blip at 01:58 but it was normal again by 02:02. I don't think payments is involved.
+```
+
+**Beat 3 — Ask the bot what it found**
+```
+priya:  /flare hypotheses
+priya:  /flare evidence
+priya:  /flare timeline
+```
+→ leading hypothesis: **deploy #7788 shrank the orders-worker Redis connection
+pool 25→5**; evidence is the pool-exhaustion logs + blame on `redis.rb`;
+payments is healthy; the flag ramp and CSS deploy are noted but not causal.
+
+**Beat 4 — Debate the decoys** (the interesting part):
+```
+rey:    So it's NOT the flag ramp? We had that duplicate-email incident last August.
+priya:  /flare validate "the async_order_confirmation flag ramp caused the incident"
+```
+→ bot pushes back: the errors are Redis pool timeouts in orders-worker, nothing
+the flag toggles.
+```
+sam:    Confirmed — orders-worker is logging "connection pool exhausted: 5/5 in use, 8k jobs queued". Queue depth 8,200 and climbing.
+omar:   That's the redis-rb 5 default. My PR dropped the pool 25 → 5 without me noticing. It's #7788.
+```
+
+**Beat 5 — Correct the record** (someone blamed payments early):
+```
+priya:  /flare correct "payments-gateway is healthy; root cause is the orders-worker Redis connection-pool shrink in deploy #7788"
+```
+→ Scribe reconciles memory: rejects the payments angle, strengthens #7788.
+
+**Beat 6 — Mitigation (human-in-the-loop)**
+```
+priya:  /flare mitigation
+```
+→ bot proposes ranked, reversible options (e.g. roll back #7788 / restore
+`ConnectionPool` size to 25). **Click Approve** on the top one — nothing is
+applied automatically; approval records intent only.
+```
+omar:   Rolling back #7788 and pinning pool size back to 25.
+```
+
+**Beat 7 — Confirm the hypothesis**
+Click **Confirm** on the #7788 hypothesis card (drives ranking and locks the
+postmortem's root cause to a human-confirmed claim).
+
+**Beat 8 — Comms draft**
+```
+priya:  /flare draft-update status
+```
+→ editable modal; pick the **status** audience (external-safe: never shows
+unconfirmed hypotheses). Edit and submit.
+
+**Beat 9 — Recovery + lifecycle** (manual in a Slack-only demo — the synthetic
+scenario stays elevated, so you narrate recovery and move status by hand):
+```
+sam:    Queue is draining — success back to 98% at 02:41, orders-worker throughput recovering.
+priya:  /flare status mitigating
+priya:  /flare status monitoring
+priya:  /flare status resolved
+```
+
+**Beat 10 — Postmortem**
+```
+priya:  /flare postmortem
+```
+→ drafted from memory; every claim cited; root cause = the human-confirmed #7788
+pool shrink. Optional: `/flare mode active` earlier to show proactive refresh.
+
+**Dashboard:** keep http://localhost:3000 open on the incident throughout —
+hypotheses, evidence, timeline, mitigations, comms and the postmortem all update
+live, each linking back to the tool call or human message that produced it.
 
 ### Command reference
 `start`, `investigate <what>`, `validate <claim>`, `correct "..."`,
-`mode <quiet|scribe|assist|active>`, `mitigation`, `draft-update <audience>`,
+`mode <quiet|scribe|assist|active>`, `status <open|mitigating|monitoring|resolved|closed>`,
+`mitigation`, `draft-update <audience>`,
 `postmortem`, `refresh`, and reads
 `hypotheses|evidence|questions|decisions|timeline|brief|dashboard`.

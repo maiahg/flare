@@ -30,9 +30,13 @@ from flare.tools.specs import (
 
 _SCENARIO_DIR = Path(__file__).parent / "scenarios"
 
+#: The scenario fixture used when a trigger carries no explicit ``scenario``.
+#: Single source of truth — every default across the pipeline points here.
+DEFAULT_SCENARIO = "orders_backlog"
+
 
 @lru_cache(maxsize=8)
-def load_scenario(name: str = "db_latency_spike") -> dict[str, Any]:
+def load_scenario(name: str = DEFAULT_SCENARIO) -> dict[str, Any]:
     """Load a scenario fixture by name (cached; fixtures are immutable)."""
     path = _SCENARIO_DIR / f"{name}.json"
     if not path.exists():
@@ -178,7 +182,7 @@ def build_synthetic_broker(
     run_id: uuid.UUID,
     incident_id: uuid.UUID,
     agent_trace_id: uuid.UUID | None = None,
-    scenario: str = "db_latency_spike",
+    scenario: str = DEFAULT_SCENARIO,
     redis: Redis | None = None,
 ) -> ToolBroker:
     """A :class:`ToolBroker` pre-loaded with the synthetic provider's adapters."""

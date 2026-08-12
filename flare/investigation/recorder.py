@@ -14,6 +14,7 @@ from flare.llm import LLMUsage
 from flare.models.tracing import AgentTrace, InvestigationRun, ToolCall
 from flare.tools import ToolBroker
 from flare.tools.providers import build_broker
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 BrokerFactory = Callable[..., ToolBroker]
 
@@ -50,7 +51,7 @@ class RunRecorder:
         run_type: str,
         trigger: dict[str, Any],
         created_by: str,
-        scenario: str = "db_latency_spike",
+        scenario: str = DEFAULT_SCENARIO,
         broker_factory: BrokerFactory | None = None,
     ) -> None:
         self._sm = sessionmaker

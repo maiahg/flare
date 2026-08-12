@@ -8,7 +8,12 @@ from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.llm import get_llm_client
 from flare.models.claims import COMMS_AUDIENCES, TimelineEntry
-from flare.models.core import INCIDENT_MODES, INCIDENT_SEVERITIES, Incident
+from flare.models.core import (
+    INCIDENT_MODES,
+    INCIDENT_SEVERITIES,
+    INCIDENT_STATUSES,
+    Incident,
+)
 from flare.slack import views
 from flare.slack.blocks import ephemeral
 from flare.slack.incident_ops import (
@@ -39,7 +44,9 @@ _USAGE = (
     "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
     "`/flare investigate <what>`, `/flare validate <claim>`, "
     "`/flare correct \"what's wrong\"`, "
-    "`/flare mode <quiet|scribe|assist|active>`, `/flare mitigation`, "
+    "`/flare mode <quiet|scribe|assist|active>`, "
+    "`/flare status <open|mitigating|monitoring|resolved|closed>`, "
+    "`/flare mitigation`, "
     "`/flare draft-update <internal|support|status|exec>`, `/flare postmortem`, "
     "`/flare refresh`, or a read: "
     "`/flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
@@ -88,6 +95,10 @@ async def handle(
         )
     if cmd.action == "mode":
         return await _handle_mode(
+            cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
+        )
+    if cmd.action == "status":
+        return await _handle_status(
             cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
         )
     if cmd.action == "correct":
@@ -246,6 +257,24 @@ async def _handle_mode(
         await service.set_mode(incident, args[0])
         await service.commit()
     return _ephemeral(f"Mode set to *{args[0]}*.")
+
+
+async def _handle_status(
+    args: list[str], *, channel_id: str, team_id: str, user_id: str | None
+) -> dict[str, Any]:
+    if not args or args[0].lower() not in INCIDENT_STATUSES:
+        return _ephemeral(
+            f"status must be one of: {', '.join(INCIDENT_STATUSES)}"
+        )
+    status = args[0].lower()
+    async with get_sessionmaker()() as session:
+        incident = await incident_for_channel(session, channel_id, team_id=team_id)
+        if incident is None:
+            return _ephemeral("No flare incident is tracking this channel.")
+        service = SteeringService(session, slack_actor(user_id or "unknown"))
+        await service.set_status(incident, status)
+        await service.commit()
+    return _ephemeral(f"Status set to *{status}*.")
 
 
 async def _handle_correct(

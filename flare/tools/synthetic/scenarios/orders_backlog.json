@@ -1,0 +1,74 @@
+{
+  "name": "orders_backlog",
+  "incident_summary": "orders-worker queue backing up since 02:16 UTC; checkout order-success dropped from 99.3% to 71%. Two changes landed in the same two-minute window: deploy #7788 (redis-rb upgrade on orders-worker) and the async_order_confirmation flag ramp 0->100.",
+  "_note": "Teaching scenario with TWO decoys. (1) A co-timed feature-flag ramp (async_order_confirmation, 02:15) that humans blame first, reinforced by a real past incident about that same flag. (2) A cosmetic web-storefront deploy (#7785, 01:50, CSS only) that landed before onset. The true cause is deploy #7788, which the redis-rb 5.0 upgrade shrank the connection pool 25->5: logs show 'pool exhausted / could not check out a connection', blame points at redis.rb line 8 in #7788, and payments-gateway is demonstrably healthy. A root cause that keys on 'a flag changed' or 'a deploy happened' rather than on what changed will name the wrong thing.",
+  "metrics": {
+    "checkout-api": {
+      "p99_ms": { "02:10": 240, "02:14": 250, "02:16": 610, "02:20": 1180, "02:28": 1320, "02:36": 1360 },
+      "error_rate": { "02:10": 0.4, "02:14": 0.5, "02:16": 2.1, "02:20": 5.6, "02:28": 8.9, "02:36": 9.4 },
+      "throughput_rps": { "02:10": 322, "02:14": 318, "02:16": 300, "02:20": 258, "02:28": 224, "02:36": 212 }
+    },
+    "orders-worker": {
+      "p99_ms": { "02:10": 210, "02:14": 225, "02:16": 4200, "02:20": 28000, "02:28": 51000, "02:36": 60000 },
+      "error_rate": { "02:10": 0.2, "02:14": 0.3, "02:16": 6.7, "02:20": 14.2, "02:28": 21.8, "02:36": 23.5 },
+      "throughput_rps": { "02:10": 305, "02:14": 300, "02:16": 96, "02:20": 41, "02:28": 19, "02:36": 12 }
+    },
+    "payments-gateway": {
+      "p99_ms": { "01:56": 190, "01:58": 470, "02:02": 205, "02:16": 198, "02:28": 201, "02:36": 199 },
+      "error_rate": { "01:56": 0.3, "01:58": 1.1, "02:02": 0.3, "02:16": 0.2, "02:28": 0.3, "02:36": 0.2 },
+      "throughput_rps": { "01:56": 140, "01:58": 138, "02:02": 141, "02:16": 139, "02:28": 140, "02:36": 141 }
+    }
+  },
+  "logs": [
+    { "at": "02:16", "service": "orders-worker", "level": "error", "text": "Redis::TimeoutError: could not check out a connection (waited 1.001s, pool size 5)", "count": 6480 },
+    { "at": "02:17", "service": "orders-worker", "level": "warn", "text": "connection pool exhausted: 5/5 in use, 812 threads waiting, 8200 jobs queued", "count": 244 },
+    { "at": "02:16", "service": "checkout-api", "level": "error", "text": "order_confirmation enqueue timed out after 2000ms; returning pending to client", "count": 3120 },
+    { "at": "02:18", "service": "orders-worker", "level": "info", "text": "OrderConfirmationWorker retry scheduled (attempt 3/25) after Redis::TimeoutError", "count": 1900 },
+    { "at": "02:02", "service": "payments-gateway", "level": "info", "text": "gateway latency normalized; p99 back under 210ms after upstream blip", "count": 1 }
+  ],
+  "traces": {
+    "available_after_minutes": 5,
+    "spans": [
+      { "service": "checkout-api", "op": "POST /orders", "p99_ms": 1360, "downstream": "orders-worker" },
+      { "service": "orders-worker", "op": "enqueue OrderConfirmationWorker", "p99_ms": 1001, "downstream": "redis" }
+    ]
+  },
+  "deploys": [
+    {
+      "id": "7788",
+      "service": "orders-worker",
+      "at": "02:14",
+      "author": "@dev-omar",
+      "diff_summary": "upgrade redis-rb 4.8 -> 5.0; adopt new client defaults: ConnectionPool size 25 -> 5, checkout_timeout 1s; switch job serializer to Oj (:compat)",
+      "files": ["Gemfile.lock", "config/initializers/redis.rb", "app/workers/order_confirmation_worker.rb"]
+    },
+    {
+      "id": "7785",
+      "service": "web-storefront",
+      "at": "01:50",
+      "author": "@dev-tara",
+      "diff_summary": "restyle the order-status banner; CSS only, no runtime change",
+      "files": ["app/assets/stylesheets/orders.css"]
+    }
+  ],
+  "code": {
+    "orders-worker": {
+      "owners": ["@orders-team"],
+      "recent_pr": "https://github.com/acme/orders-worker/pull/933",
+      "blame": "config/initializers/redis.rb line 8: ConnectionPool.new(size: 25) changed to rely on redis-rb 5.0 default (size 5) in #7788 (@dev-omar). order_confirmation_worker.rb business logic unchanged."
+    },
+    "payments-gateway": {
+      "owners": ["@payments-team"],
+      "recent_pr": "https://github.com/acme/payments-gateway/pull/2201",
+      "blame": "no changes in 9 days; last deploy #7702 on 2026-08-03. The 01:58 p99 blip self-resolved by 02:02, before incident onset."
+    }
+  },
+  "flags": [
+    { "key": "async_order_confirmation", "service": "orders-worker", "at": "02:15", "from": 0, "to": 100, "actor": "@dev-rey" },
+    { "key": "checkout_express", "service": "checkout-api", "at": "00:10", "from": 50, "to": 50, "actor": "@dev-rey" }
+  ],
+  "history": [
+    { "at": "2026-01-09", "title": "order backlog after a redis pool shrink", "resolution": "raised ConnectionPool size 5 -> 25 and bumped worker concurrency" },
+    { "at": "2025-08-22", "title": "async_order_confirmation flag ramp caused duplicate confirmation emails", "resolution": "added an idempotency key; the ramp itself was safe to keep" }
+  ]
+}

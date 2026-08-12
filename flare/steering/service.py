@@ -29,7 +29,14 @@ from flare.models.claims import (
     PostmortemDraft,
     TimelineEntry,
 )
-from flare.models.core import ACTIVE_MODE, INCIDENT_MODES, Incident, User, Workspace
+from flare.models.core import (
+    ACTIVE_MODE,
+    INCIDENT_MODES,
+    INCIDENT_STATUSES,
+    Incident,
+    User,
+    Workspace,
+)
 from flare.models.provenance import HUMAN_STATEMENT_KIND
 from flare.postmortem import generate_postmortem
 from flare.steering.actors import Actor
@@ -46,6 +53,13 @@ HUMAN_CONFIDENCE = 1.0
 
 #: How many existing claims a correction is reconciled against.
 CORRECTION_CANDIDATES = 25
+
+#: Lifecycle timestamp stamped when an incident first enters a status.
+_STATUS_TIMESTAMPS: dict[str, str] = {
+    "mitigating": "mitigated_at",
+    "resolved": "resolved_at",
+    "closed": "closed_at",
+}
 
 _logger = logging.getLogger("flare.steering")
 
@@ -199,6 +213,28 @@ class SteeringService:
             action=f"set mode to {mode}",
         )
         await self._schedule_active_mode(incident, mode)
+        return incident
+
+    async def set_status(self, incident: Incident, status: str) -> Incident:
+        """Move the incident's lifecycle status."""
+        if status not in INCIDENT_STATUSES:
+            raise ValidationError(
+                f"status must be one of: {', '.join(INCIDENT_STATUSES)}"
+            )
+        previous = incident.status
+        if previous == status:
+            return incident
+        incident.status = status
+        stamp = _STATUS_TIMESTAMPS.get(status)
+        if stamp is not None and getattr(incident, stamp) is None:
+            setattr(incident, stamp, datetime.now(UTC))
+        await self._session.flush()
+        await self._journal_incident(
+            incident,
+            before={"status": previous},
+            after={"status": status},
+            action=f"set status to {status}",
+        )
         return incident
 
     async def _schedule_active_mode(self, incident: Incident, mode: str) -> None:

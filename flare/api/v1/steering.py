@@ -32,6 +32,7 @@ from flare.api.v1.schemas import (
     PostmortemDraftRead,
     QuestionPatch,
     RunAccepted,
+    StatusUpdate,
 )
 from flare.approvals import decide_approval
 from flare.comms import CommsService
@@ -110,6 +111,16 @@ async def set_mode(
 ) -> Incident:
     """Set the behavior mode: quiet | scribe | assist | active."""
     updated = await service.set_mode(incident, body.mode)
+    await service.commit(updated)
+    return updated
+
+
+@router.post("/incidents/{incident_id}/status", response_model=IncidentRead)
+async def set_status(
+    incident: IncidentDep, body: StatusUpdate, service: ServiceDep
+) -> Incident:
+    """Move the incident status: open | mitigating | monitoring | resolved | closed."""
+    updated = await service.set_status(incident, body.status)
     await service.commit(updated)
     return updated
 

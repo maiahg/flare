@@ -1,3 +1,7 @@
-from flare.tools.synthetic.provider import build_synthetic_broker, load_scenario
+from flare.tools.synthetic.provider import (
+    DEFAULT_SCENARIO,
+    build_synthetic_broker,
+    load_scenario,
+)
 
-__all__ = ["build_synthetic_broker", "load_scenario"]
+__all__ = ["DEFAULT_SCENARIO", "build_synthetic_broker", "load_scenario"]

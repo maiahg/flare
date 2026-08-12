@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from flare.config import get_settings
 from flare.tools.broker import ToolBroker
 from flare.tools.specs import CATALOGUE_BY_NAME
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def build_broker(
     run_id: uuid.UUID,
     incident_id: uuid.UUID,
     agent_trace_id: uuid.UUID | None = None,
-    scenario: str = "db_latency_spike",
+    scenario: str = DEFAULT_SCENARIO,
     redis: Redis | None = None,
     provider: str | None = None,
 ) -> ToolBroker:

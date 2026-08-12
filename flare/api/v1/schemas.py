@@ -248,6 +248,9 @@ class IncidentCreate(WriteModel):
 class ModeUpdate(WriteModel):
     mode: str
 
+class StatusUpdate(WriteModel):
+    status: str
+
 class InvestigateRequest(WriteModel):
     target: str | None = None
     since: str | None = None

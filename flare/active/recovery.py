@@ -20,6 +20,7 @@ from flare.models.claims import TimelineEntry
 from flare.models.core import Incident
 from flare.models.tracing import InvestigationRun
 from flare.events.outbox import commit_and_publish
+from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.active.recovery")
 
@@ -117,7 +118,7 @@ class RecoveryWatcher:
         redis: Redis,
         settings: RecoverySettings,
         service: str,
-        scenario: str = "db_latency_spike",
+        scenario: str = DEFAULT_SCENARIO,
     ) -> None:
         self._incident_id = incident_id
         self._sm = sessionmaker
