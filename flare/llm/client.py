@@ -129,7 +129,7 @@ def _retry_after_seconds(exc: Exception) -> float | None:
         return None
     try:
         return max(0.0, float(raw))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 

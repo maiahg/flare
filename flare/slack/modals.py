@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 
 from flare.models.claims import COMMS_AUDIENCES
-from flare.secrets import get_slack_bot_token
+from flare.secrets import slack_bot_token
 
 _logger = logging.getLogger("flare.slack.modals")
 
@@ -27,7 +27,7 @@ class SlackModals:
     """``views.open`` / ``views.update``. No message-posting method exists."""
 
     def __init__(self, token: str | None = None) -> None:
-        self._token = token if token is not None else get_slack_bot_token()
+        self._token = token if token is not None else slack_bot_token()
 
     async def _call(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         if method not in VIEW_METHODS:
