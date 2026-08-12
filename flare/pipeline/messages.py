@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Mapping, TypedDict
 
 from sqlalchemy import select
@@ -32,6 +33,15 @@ from flare.worker.enqueue import enqueue_adaptive_run
 _logger = logging.getLogger("flare.pipeline")
 
 _TERMINAL_STATUSES = frozenset({"resolved", "closed"})
+
+
+def _slack_ts_to_datetime(slack_ts: Any) -> datetime | None:
+    if not slack_ts:
+        return None
+    try:
+        return datetime.fromtimestamp(float(slack_ts), tz=UTC)
+    except (TypeError, ValueError):
+        return None
 
 
 class _Envelope(TypedDict):
@@ -103,8 +113,11 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
             "created_by": "scribe",
         }
 
+        occurred_at = _slack_ts_to_datetime(slack_ts)
         for entry in plan.timeline:
-            await repo.create(TimelineEntry, **common, **entry)
+            await repo.create(
+                TimelineEntry, **common, occurred_at=occurred_at, **entry
+            )
         for fact in plan.facts:
             await repo.create(Fact, **common, **fact)
         for q in plan.questions:

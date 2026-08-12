@@ -42,8 +42,8 @@ _CONTRADICTION = re.compile(
     r"unrelated to)\b",
     re.IGNORECASE,
 )
-#: Explicit asks. `/flare investigate|validate` must always trigger.
-_COMMAND = re.compile(r"/flare\s+(investigate|validate)\b", re.IGNORECASE)
+#: Explicit asks. `@flare investigate|validate` must always trigger.
+_COMMAND = re.compile(r"[/@]flare\s+(investigate|validate)\b", re.IGNORECASE)
 #: A decision reached in-channel — what the team chose to do (or not do).
 _DECISION = re.compile(
     r"\b(decision:|we (?:decided|agreed|will|'ll)\b|we'?re going to|going with|"

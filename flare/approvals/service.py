@@ -212,7 +212,7 @@ async def mitigation_view(
     actor: Actor,
     dashboard_url: str,
 ) -> dict[str, Any]:
-    """`/flare mitigation` — options with Approve/Reject."""
+    """`@flare mitigation` — options with Approve/Reject."""
     options = list(
         await session.scalars(
             select(MitigationOption)

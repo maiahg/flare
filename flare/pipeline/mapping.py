@@ -20,9 +20,8 @@ _MIN_BODY = 15
 
 
 def _statement(signal: ExtractedSignal, text: str) -> str:
-    """The substantive text for a decision/action item, not the trigger phrase."""
-    body = signal.value.get("text", "")
-    return body if len(body) > _MIN_BODY else text
+    body = (signal.value.get("text", "") or "").strip()
+    return body if len(body) > _MIN_BODY else text.strip()
 
 
 def _dedupe(items: list[dict], key: str) -> list[dict]:
@@ -53,8 +52,9 @@ def plan_claims(text: str, signals: list[ExtractedSignal]) -> ClaimPlan:
             timeline.append({"entry_type": "mitigation", "description": body or text})
             decisions.append({"statement": _statement(s, text)})
         elif s.signal_type in {"symptom", "metric", "error"} and s.confidence >= 0.7:
-            if body:
-                facts.append({"statement": body})
+            statement = _statement(s, text)
+            if statement:
+                facts.append({"statement": statement})
         elif s.signal_type == "open_question":
             if body:
                 questions.append({"question": body})
@@ -65,7 +65,7 @@ def plan_claims(text: str, signals: list[ExtractedSignal]) -> ClaimPlan:
 
     return ClaimPlan(
         timeline,
-        facts,
+        _dedupe(facts, "statement"),
         questions,
         _dedupe(decisions, "statement"),
         _dedupe(action_items, "description"),

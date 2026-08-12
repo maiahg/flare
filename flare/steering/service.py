@@ -97,7 +97,7 @@ class ManualRunRequest:
         ask = " ".join(filter(None, (self.target, self.focus))).strip()
         return {
             "reason": "manual_investigate",
-            "command": "/flare investigate",
+            "command": "@flare investigate",
             "user_id": actor.user_id,
             "target": self.target,
             "since": self.since,

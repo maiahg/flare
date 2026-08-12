@@ -1,6 +1,6 @@
 # flare
 
-An incident-response AI copilot. Drive it with `/flare` commands in a Slack
+An incident-response AI copilot. Drive it by mentioning `@flare` in a Slack
 incident channel; a background worker investigates using an LLM (via OpenRouter)
 against telemetry (synthetic scenarios by default, or real Prometheus/Loki/
 GitHub/Unleash backends), writes structured incident memory (facts, hypotheses,
@@ -28,5 +28,5 @@ Notes:
 ## Full Slack demo
 
 See **[DEMO_SLACK.md](./DEMO_SLACK.md)** for the end-to-end walkthrough: tunneling
-to Slack, the Slack app manifest (scopes, events, slash command, interactivity,
-OAuth), installing to a workspace, and a step-by-step `/flare` demo script.
+to Slack, the Slack app manifest (scopes, events, mentions, interactivity,
+OAuth), installing to a workspace, and a step-by-step `@flare` demo script.

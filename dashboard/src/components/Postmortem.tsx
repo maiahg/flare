@@ -3,8 +3,14 @@ import { EmptyState } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { absoluteTime } from "@/lib/format";
 
-type Entry = { text?: string; at?: string | null };
+type Entry = { text?: string; at?: string | null; entry_type?: string | null };
 type Sections = Record<string, unknown>;
+
+const ENTRY_TYPE_LABELS: Record<string, string> = {
+  deploy: "Deploy",
+  mitigation: "Mitigation",
+  observation: "Observation",
+};
 
 function asEntries(value: unknown): Entry[] {
   return Array.isArray(value) ? (value as Entry[]) : [];
@@ -33,6 +39,34 @@ function EntryList({ entries, label }: { entries: Entry[]; label: string }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function TimelineList({ entries }: { entries: Entry[] }) {
+  const shown = entries.filter((e) => asString(e.text));
+  if (shown.length === 0)
+    return <EmptyState>Nothing recorded for timeline.</EmptyState>;
+  return (
+    <ol aria-label="Timeline" className="m-0 list-none space-y-2.5 p-0">
+      {shown.map((e, i) => {
+        const type = asString(e.entry_type);
+        return (
+          <li key={i} className="flex gap-2.5 text-sm">
+            <span className="w-36 shrink-0 text-[var(--muted)] tabular-nums">
+              {e.at ? absoluteTime(e.at) : "time unknown"}
+            </span>
+            <p className="text-[var(--foreground)]/90">
+              {type ? (
+                <span className="mr-1.5 rounded bg-[var(--border)] px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                  {ENTRY_TYPE_LABELS[type] ?? type}
+                </span>
+              ) : null}
+              {e.text}
+            </p>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -75,7 +109,7 @@ export function PostmortemView({ postmortem }: { postmortem: Postmortem | null }
   if (!postmortem) {
     return (
       <EmptyState>
-        No postmortem yet. Run <code>/flare postmortem</code> in the incident
+        No postmortem yet. Run <code>@flare postmortem</code> in the incident
         channel to draft one from memory.
       </EmptyState>
     );
@@ -137,7 +171,7 @@ export function PostmortemView({ postmortem }: { postmortem: Postmortem | null }
       </Section>
 
       <Section title="Timeline">
-        <EntryList entries={asEntries(sections.timeline)} label="Timeline" />
+        <TimelineList entries={asEntries(sections.timeline)} />
       </Section>
 
       <Section title="What we know">

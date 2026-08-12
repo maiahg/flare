@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.redis import get_redis
-from flare.slack import oauth, commands as slack_commands
+from flare.slack import oauth
 from flare.slack.dedupe import mark_seen
 from flare.slack.events import is_bot_message, normalize_event_callback
 from flare.slack.incident_ops import (
@@ -146,30 +146,6 @@ async def slack_events(request: Request) -> dict[str, Any]:
 
     # Unknown top-level type — ACK so Slack doesn't retry.
     return {"ok": True, "status": "ignored"}
-
-
-@router.post("/commands")
-async def slack_commands_route(request: Request) -> dict[str, Any]:
-    body = await _verified_body(request)
-    form = parse_qs(body)
-    command = form.get("command", [""])[0]
-    text = form.get("text", [""])[0]
-    channel_id = form.get("channel_id", [""])[0]
-    channel_name = form.get("channel_name", [""])[0] or None
-    team_id = form.get("team_id", [""])[0]
-    user_id = form.get("user_id", [""])[0] or None
-    trigger_id = form.get("trigger_id", [""])[0] or None
-    _logger.info("slack command received", extra={"command": command, "text": text})
-    if command == "/flare":
-        return await slack_commands.handle(
-            text,
-            channel_id=channel_id,
-            channel_name=channel_name,
-            team_id=team_id,
-            user_id=user_id,
-            trigger_id=trigger_id,
-        )
-    return {"response_type": "ephemeral", "text": f"Unknown command `{command}`."}
 
 
 @router.post("/interactions")

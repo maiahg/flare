@@ -66,7 +66,7 @@ def _trigger(claim: str, target: dict[str, Any], user_id: str | None) -> dict[st
     """A trigger payload that focuses the read fan-out on the claim."""
     return {
         "reason": "flare_validate",
-        "command": "/flare validate",
+        "command": "@flare validate",
         "user_id": user_id,
         "focus": claim,
         "messages": [{"text": claim, "user_id": user_id}],
@@ -84,7 +84,7 @@ def _trigger(claim: str, target: dict[str, Any], user_id: str | None) -> dict[st
 
 
 async def run_claim_verification(ctx: dict, payload: dict[str, Any]) -> str:
-    """Verify one claim against freshly gathered evidence (`/flare validate`)."""
+    """Verify one claim against freshly gathered evidence (`@flare validate`)."""
     from flare.adaptive.runner import start_adaptive_run
 
     incident_id = uuid.UUID(payload["incident_id"])

@@ -102,7 +102,7 @@ async def active_refresh(ctx: dict, payload: dict[str, Any]) -> str:
             _logger.info("active loop stopping: token replaced or expired")
             return "superseded"
 
-    # A manual `/flare refresh` is an explicit ask: answer in-channel regardless
+    # A manual `@flare refresh` is an explicit ask: answer in-channel regardless
     # of mode. The scheduled loop stays governed so active mode isn't chatty.
     poster = (
         _slack_poster(incident_id, channel, mode, force=True)

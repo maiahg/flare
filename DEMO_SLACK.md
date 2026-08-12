@@ -1,6 +1,6 @@
 # flare — Slack demo runbook
 
-flare is an incident-response AI copilot. You drive it with `/flare` commands in
+flare is an incident-response AI copilot. You drive it by mentioning `@flare` in
 a Slack incident channel; a background worker investigates using an LLM (via
 OpenRouter) against **synthetic telemetry scenarios**, writes structured memory
 (facts, hypotheses, evidence, timeline, mitigations), posts back with
@@ -73,7 +73,7 @@ Slack must reach the backend over HTTPS → run a tunnel (cloudflared/ngrok) to 
    into `.env`; restart backend + worker.
 5. Install to workspace (creates the `workspaces` DB row commands need):
    ```
-   https://slack.com/oauth/v2/authorize?client_id=<CLIENT_ID>&scope=commands,chat:write,channels:history,channels:read&redirect_uri=https://TUNNEL_URL/slack/oauth/callback
+   https://slack.com/oauth/v2/authorize?client_id=<CLIENT_ID>&scope=chat:write,channels:history,channels:read,app_mentions:read&redirect_uri=https://TUNNEL_URL/slack/oauth/callback
    ```
    Approve → JSON `{"ok": true, ...}`.
 
@@ -93,26 +93,22 @@ features:
   bot_user:
     display_name: flare
     always_online: true
-  slash_commands:
-    - command: /flare
-      url: https://TUNNEL_URL/slack/commands
-      description: Incident copilot
-      usage_hint: 'start "title" --sev sev2'
 oauth_config:
   redirect_urls:
     - https://TUNNEL_URL/slack/oauth/callback
   scopes:
     bot:
-      - commands
       - chat:write
       - channels:history
       - channels:read
+      - app_mentions:read
 settings:
   event_subscriptions:
     request_url: https://TUNNEL_URL/slack/events
     bot_events:
       - message.channels
       - member_joined_channel
+      - app_mention
   interactivity:
     is_enabled: true
     request_url: https://TUNNEL_URL/slack/interactions
@@ -134,7 +130,7 @@ podman exec flare-postgres psql -U postgres -d vectordb -c "TRUNCATE incidents C
 podman exec flare-redis redis-cli FLUSHALL
 ```
 
-Then reload the dashboard — the incident list is empty and you can `/flare start`
+Then reload the dashboard — the incident list is empty and you can `@flare start`
 a fresh one. Restarting the backend/worker is not required.
 
 > **Nuclear option** (also resets migrations and *removes* the workspace install,
@@ -155,7 +151,7 @@ payments-gateway) points squarely at #7788.
 
 | Handle | Role |
 |---|---|
-| `@priya` | Incident Commander — runs every `/flare` command |
+| `@priya` | Incident Commander — runs every `@flare` command |
 | `@sam` | SRE watching the dashboards |
 | `@omar` | orders-team — shipped deploy #7788 |
 | `@rey` | product — owns the `async_order_confirmation` flag |
@@ -165,12 +161,12 @@ payments-gateway) points squarely at #7788.
 
 **Beat 1 — Declare the incident**
 ```
-priya:  /flare start "Orders stuck in pending — checkout success dropping" --sev sev1 --desc order confirmations backing up since ~02:16 UTC
+priya:  @flare start "Orders stuck in pending — checkout success dropping" --sev sev1 --desc order confirmations backing up since ~02:16 UTC
 ```
 → bot posts the incident card and **silently** starts a read-only investigation.
 By default an incident is in **quiet** mode: the agent investigates and writes to
 memory/dashboard but does not post findings or mitigations to the channel unless
-you ask (a read command, `/flare investigate|validate`, or `/flare mode assist`
+you ask (a read command, `@flare investigate|validate`, or `@flare mode assist`
 to turn on proactive posting). Nothing happens without a command — inviting the
 bot to a channel no longer opens an incident on its own.
 
@@ -181,24 +177,27 @@ every message):
 ```
 sam:   Order success on the checkout dashboard fell 99.3% → 71% starting 02:16. Customers see a "pending" spinner.
 rey:   Heads up — I ramped async_order_confirmation 0 → 100 at 02:15. Could be us. Want me to roll it back?
-omar:  I also shipped #7788 to orders-worker at 02:14 — a redis-rb 5.0 upgrade. Timing lines up too.
+omar:  I also shipped deploy 7788 (#7788) to orders-worker at 02:14 — a redis-rb 5.0 upgrade. Timing lines up too.
+sam:   For the record there was also web-storefront deploy 7785 at 01:50 — CSS only, almost certainly a decoy but logging it.
 lin:   payments-gateway had a p99 blip at 01:58 but it was normal again by 02:02. I don't think payments is involved.
 ```
 
 **Beat 3 — Ask the bot what it found** (in quiet mode this is how findings
-surface — the reads are ephemeral, the dashboard has the full picture):
+surface — every answer posts publicly in the channel, the dashboard has the full
+picture):
 ```
-priya:  /flare hypotheses
-priya:  /flare evidence
-priya:  /flare timeline
+priya:  @flare hypotheses
+priya:  @flare evidence
+priya:  @flare timeline
 ```
 
-> **Private vs public:** `/flare <action>` answers you *privately* (ephemeral —
-> only you see it). To broadcast an answer so the whole channel sees it, mention
-> the bot instead: `@flare hypotheses`, `@flare validate "…"`, `@flare status
-> resolved`. `@flare` supports reads, `investigate`/`validate`, and `status`;
-> everything else (start, mode, correct, mitigation, draft-update, postmortem)
-> stays on `/flare` — some open a dialog, which a mention can't do.
+> **One surface — `@flare`:** every action runs by mentioning the bot and every
+> answer posts *publicly* in the channel (there is no private/slash surface).
+> `@flare` handles the full command set — reads, `start`, `investigate`,
+> `validate`, `mode`, `correct`, `mitigation`, `status`, `draft-update`,
+> `postmortem`, `refresh`. Actions that used to pop a Slack dialog (e.g.
+> `draft-update`) instead post a dashboard link, since a mention carries no
+> `trigger_id` to open a modal.
 → leading hypothesis: **deploy #7788 shrank the orders-worker Redis connection
 pool 25→5**; evidence is the pool-exhaustion logs + blame on `redis.rb`;
 payments is healthy; the flag ramp and CSS deploy are noted but not causal.
@@ -206,7 +205,7 @@ payments is healthy; the flag ramp and CSS deploy are noted but not causal.
 **Beat 4 — Debate the decoys** (the interesting part):
 ```
 rey:    So it's NOT the flag ramp? We had that duplicate-email incident last August.
-priya:  /flare validate "the async_order_confirmation flag ramp caused the incident"
+priya:  @flare validate "the async_order_confirmation flag ramp caused the incident"
 ```
 → bot pushes back: the errors are Redis pool timeouts in orders-worker, nothing
 the flag toggles.
@@ -217,13 +216,25 @@ omar:   That's the redis-rb 5 default. My PR dropped the pool 25 → 5 without m
 
 **Beat 5 — Correct the record** (someone blamed payments early):
 ```
-priya:  /flare correct "payments-gateway is healthy; root cause is the orders-worker Redis connection-pool shrink in deploy #7788"
+priya:  @flare correct "payments-gateway is healthy; root cause is the orders-worker Redis connection-pool shrink in deploy #7788"
 ```
 → Scribe reconciles memory: rejects the payments angle, strengthens #7788.
 
+**Beat 5b — Stopgap mitigations while the fix is confirmed** (buy headroom; each
+is a real state-changing action, so each lands on the **timeline** as a
+mitigation):
+```
+sam:    Scaling up orders-worker replicas 3 → 6 to work the backlog down while we confirm root cause.
+omar:   Restarting the orders-worker pods to clear the stuck connections.
+sam:    Draining the oldest 2k jobs into a retry queue so customers stop seeing the spinner.
+```
+→ these relieve pressure but don't fix root cause — each pod still opens only 5
+Redis connections, so the queue keeps refilling. The real fix is the #7788
+rollback in Beat 6. All three surface in `@flare timeline`.
+
 **Beat 6 — Mitigation (human-in-the-loop)**
 ```
-priya:  /flare mitigation
+priya:  @flare mitigation
 ```
 → bot proposes ranked, reversible options (e.g. roll back #7788 / restore
 `ConnectionPool` size to 25). **Click Approve** on the top one — nothing is
@@ -233,7 +244,7 @@ priya:  Decision: we're rolling back #7788 and pinning the orders-worker Redis p
 omar:   Rolling back #7788 and pinning pool size back to 25.
 ```
 → Scribe records both as **decisions** on the incident (the rollback also lands
-on the timeline as a mitigation). Read them back with `/flare decisions`.
+on the timeline as a mitigation). Read them back with `@flare decisions`.
 
 **Beat 6b — Capture follow-ups** (each becomes a postmortem action item):
 ```
@@ -252,10 +263,11 @@ postmortem's root cause to a human-confirmed claim).
 
 **Beat 8 — Comms draft**
 ```
-priya:  /flare draft-update status
+priya:  @flare draft-update status
 ```
-→ editable modal; pick the **status** audience (external-safe: never shows
-unconfirmed hypotheses). Edit and submit.
+→ flare drafts the **status** update (external-safe: never shows unconfirmed
+hypotheses) and posts a dashboard link where you review, edit and submit it.
+flare never sends it for you.
 
 **Beat 9 — Recovery + lifecycle**
 Approving a mitigation (Beat 6/7) schedules a read-only **recovery watch**. With
@@ -267,22 +279,24 @@ from a tool call, not something anyone typed). If you leave `RECOVERY__SCENARIO`
 unset the investigation scenario stays elevated and you narrate recovery by hand.
 ```
 sam:    Queue is draining — success back to 98% at 02:41, orders-worker throughput recovering.
-priya:  /flare status monitoring
-priya:  /flare status resolved
+priya:  @flare status monitoring
+priya:  @flare status resolved
 ```
-> The timeline is a log of **consequential events**, not a chat transcript: the
-> only entries are deploys (e.g. `omar` shipping / rolling back #7788),
-> mitigations, and the recovery observation above. Read it with `/flare
-> timeline`; it also renders in the postmortem's Timeline section.
+> The timeline is a log of **consequential events**, not a chat transcript. By
+> now it holds: the two deploys from Beat 2 (orders-worker #7788 and the
+> web-storefront decoy #7785), the three stopgap mitigations from Beat 5b
+> (scale-up, restart, queue-drain), the #7788 rollback + pool-pin from Beat 6,
+> and the metrics-sourced recovery observation above — no plain chat. Read it
+> with `@flare timeline`; it also renders in the postmortem's Timeline section.
 
 **Beat 10 — Postmortem**
 ```
-priya:  /flare postmortem
+priya:  @flare postmortem
 ```
 → drafted from memory; every claim cited; root cause = the human-confirmed #7788
 pool shrink. The **Decisions** section carries the rollback/pool-pin decisions
 from Beat 6 and the **Action items** section carries the three follow-ups from
-Beat 6b. Optional: `/flare mode active` earlier to show proactive refresh.
+Beat 6b. Optional: `@flare mode active` earlier to show proactive refresh.
 
 **Dashboard:** keep http://localhost:3000 open on the incident throughout —
 overview, runs, evidence, hypotheses and the postmortem all update live. (The

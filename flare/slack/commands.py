@@ -14,7 +14,7 @@ from flare.models.core import (
     Incident,
 )
 from flare.slack import views
-from flare.slack.blocks import ephemeral, in_channel
+from flare.slack.blocks import ephemeral
 from flare.slack.incident_ops import (
     adopt_or_create_incident,
     get_workspace_by_team,
@@ -41,29 +41,16 @@ _TIMELINE_N = 10
 _READ_COMMANDS = ("hypotheses", "evidence", "questions", "decisions", "brief",
                   "dashboard", "timeline")
 
-#: Commands answerable via a public `@flare <action>` mention. 
-_MENTION_ACTIONS = frozenset(
-    (*_READ_COMMANDS, "investigate", "validate", "status")
-)
-
-_MENTION_HELP = (
-    "That isn't available via @mention. Use `/flare <action>` for the rest — "
-    "some open a dialog and some stay private on purpose. "
-    "`@flare` supports: `hypotheses`, `evidence`, `questions`, `decisions`, "
-    "`timeline`, `brief`, `dashboard`, `investigate <what>`, "
-    "`validate <claim>`, and `status <state>`."
-)
-
 _USAGE = (
-    "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
-    "`/flare investigate <what>`, `/flare validate <claim>`, "
-    "`/flare correct \"what's wrong\"`, "
-    "`/flare mode <quiet|scribe|assist|active>`, "
-    "`/flare status <open|mitigating|monitoring|resolved|closed>`, "
-    "`/flare mitigation`, "
-    "`/flare draft-update <internal|support|status|exec>`, `/flare postmortem`, "
-    "`/flare refresh`, or a read: "
-    "`/flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
+    "Usage: `@flare start \"title\" [--sev sevN] [--desc ...]`, "
+    "`@flare investigate <what>`, `@flare validate <claim>`, "
+    "`@flare correct \"what's wrong\"`, "
+    "`@flare mode <quiet|scribe|assist|active>`, "
+    "`@flare status <open|mitigating|monitoring|resolved|closed>`, "
+    "`@flare mitigation`, "
+    "`@flare draft-update <internal|support|status|exec>`, `@flare postmortem`, "
+    "`@flare refresh`, or a read: "
+    "`@flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
 )
 
 
@@ -88,16 +75,14 @@ async def handle_mention(
     command_text: str,
     *,
     channel_id: str,
+    channel_name: str | None = None,
     team_id: str = "",
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """Run a public `@flare <action>` mention and return what to post in-channel."""
-    action = parse(command_text).action
-    if action not in _MENTION_ACTIONS:
-        return in_channel(_MENTION_HELP)
     result = await handle(
         command_text,
         channel_id=channel_id,
+        channel_name=channel_name,
         team_id=team_id,
         user_id=user_id,
         trigger_id=None,
@@ -108,7 +93,7 @@ async def handle_mention(
 
 
 def _dashboard_url(incident_id: Any) -> str:
-    base = str(get_settings().app_base_url).rstrip("/")
+    base = str(get_settings().dashboard_base_url).rstrip("/")
     return f"{base}/incidents/{incident_id}"
 
 
@@ -250,7 +235,7 @@ async def _handle_start(
             "incident_id": str(incident_id),
             "trigger": {
                 "reason": "flare_start",
-                "command": "/flare start",
+                "command": "@flare start",
                 "user_id": user_id,
             },
             "created_by": user_id or "system",
@@ -268,20 +253,20 @@ async def _handle_investigate(
     team_id: str,
     user_id: str | None,
 ) -> dict[str, Any]:
-    """`/flare investigate <text>` — the rule floor's explicit ask"""
+    """`@flare investigate <text>` — the rule floor's explicit ask"""
     focus = " ".join(args).strip()
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
             return _ephemeral(
-                "No flare incident is tracking this channel. Try `/flare start`."
+                "No flare incident is tracking this channel. Try `@flare start`."
             )
         actor = slack_actor(user_id or "unknown")
         service = SteeringService(session, actor)
         request = await service.request_investigation(incident, focus=focus or action)
         trigger = request.trigger(actor)
         trigger["reason"] = f"flare_{action}"
-        trigger["command"] = f"/flare {action}"
+        trigger["command"] = f"@flare {action}"
         incident_id = incident.id
         service.defer(
             lambda: enqueue_adaptive_run(
@@ -303,18 +288,18 @@ async def _handle_validate(
     team_id: str,
     user_id: str | None,
 ) -> dict[str, Any]:
-    """`/flare validate <claim>` — verify one claim against fresh evidence."""
+    """`@flare validate <claim>` — verify one claim against fresh evidence."""
     claim = " ".join(args).strip()
     if not claim:
         return _ephemeral(
             "Give me a claim to check, e.g. "
-            "`/flare validate the checkout-api deploy caused the p99 spike`."
+            "`@flare validate the checkout-api deploy caused the p99 spike`."
         )
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
             return _ephemeral(
-                "No flare incident is tracking this channel. Try `/flare start`."
+                "No flare incident is tracking this channel. Try `@flare start`."
             )
         incident_id = incident.id
     await enqueue_claim_verification(
@@ -365,7 +350,7 @@ async def _handle_correct(
 ) -> dict[str, Any]:
     text = " ".join(args).strip().strip('"').strip("'")
     if not text:
-        return _ephemeral('Usage: `/flare correct "what is actually true"`')
+        return _ephemeral('Usage: `@flare correct "what is actually true"`')
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
@@ -381,7 +366,7 @@ async def _handle_correct(
 async def _handle_mitigation(
     *, channel_id: str, team_id: str, user_id: str | None
 ) -> dict[str, Any]:
-    """`/flare mitigation` — options with Approve/Reject."""
+    """`@flare mitigation` — options with Approve/Reject."""
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
@@ -397,7 +382,7 @@ async def _handle_mitigation(
 async def _handle_refresh(
     *, channel_id: str, team_id: str, user_id: str | None
 ) -> dict[str, Any]:
-    """`/flare refresh` — re-read telemetry and re-rank hypotheses now."""
+    """`@flare refresh` — re-read telemetry and re-rank hypotheses now."""
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
@@ -418,7 +403,7 @@ async def _handle_refresh(
 async def _handle_postmortem(
     *, channel_id: str, team_id: str, user_id: str | None
 ) -> dict[str, Any]:
-    """`/flare postmortem` — generate/update the draft"""
+    """`@flare postmortem` — generate/update the draft"""
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
         if incident is None:
@@ -441,11 +426,10 @@ async def _handle_draft_update(
     user_id: str | None,
     trigger_id: str | None,
 ) -> dict[str, Any]:
-    """`/flare draft-update <audience>` — open the draft modal"""
     audience = (args[0].lower() if args else "").strip()
     if audience not in COMMS_AUDIENCES:
         return _ephemeral(
-            f"Usage: `/flare draft-update <{'|'.join(COMMS_AUDIENCES)}>`"
+            f"Usage: `@flare draft-update <{'|'.join(COMMS_AUDIENCES)}>`"
         )
 
     async with get_sessionmaker()() as session:

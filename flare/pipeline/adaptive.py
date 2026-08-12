@@ -89,7 +89,7 @@ async def _build_poster(
 
 
 def _merge_explicit(trigger: dict[str, Any], explicit: dict[str, Any]) -> dict[str, Any]:
-    """Fold an explicitly-supplied trigger (a `/flare investigate`) into the batch."""
+    """Fold an explicitly-supplied trigger (an `@flare investigate`) into the batch."""
     seen = {(s.get("type"), s.get("text")) for s in trigger.get("signals", [])}
     trigger["signals"] = [
         *trigger.get("signals", []),
