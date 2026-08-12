@@ -3,17 +3,6 @@ import { absoluteTime, describeSource, relativeTime } from "@/lib/format";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 
-const COUNT_LABELS: Array<[keyof IncidentDetail["counts"], string]> = [
-  ["facts", "Facts"],
-  ["evidence", "Evidence"],
-  ["hypotheses", "Hypotheses"],
-  ["open_questions", "Questions"],
-  ["decisions", "Decisions"],
-  ["action_items", "Action items"],
-  ["timeline_entries", "Timeline"],
-  ["mitigation_options", "Mitigations"],
-];
-
 function Row({
   label,
   children,
@@ -75,30 +64,13 @@ export function IncidentOverview({ incident }: { incident: IncidentDetail }) {
             <Row label="Resolved">
               <When iso={incident.resolved_at} />
             </Row>
-            <Row label="Slack channel">{incident.slack_channel_id ?? "—"}</Row>
+            <Row label="Slack channel">
+              {incident.slack_channel_name
+                ? `#${incident.slack_channel_name}`
+                : (incident.slack_channel_id ?? "—")}
+            </Row>
           </dl>
         </Panel>
-      </div>
-
-      <div>
-        <h2 className="eyebrow mb-2">Recorded memory</h2>
-        <ul
-          aria-label="counts"
-          className="grid list-none grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-3 p-0"
-        >
-          {COUNT_LABELS.map(([key, label]) => (
-            <li
-              key={key}
-              data-testid={`count-${key}`}
-              className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-            >
-              <div className="text-2xl font-semibold tabular-nums">
-                {incident.counts[key]}
-              </div>
-              <div className="mt-0.5 text-xs text-[var(--muted)]">{label}</div>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );

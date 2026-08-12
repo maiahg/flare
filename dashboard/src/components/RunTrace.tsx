@@ -3,6 +3,14 @@ import { EmptyState } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { NUMBER, absoluteTime, relativeTime } from "@/lib/format";
 
+function triggerLabel(trigger: Run["trigger"]): string | null {
+  if (!trigger || typeof trigger !== "object") return null;
+  const reason = trigger["reason"];
+  return typeof reason === "string" && reason.length > 0
+    ? reason.replace(/_/g, " ")
+    : null;
+}
+
 function tokenSummary(tokens: AgentTrace["tokens"]): string | null {
   if (!tokens) return null;
   const asNum = (v: unknown) => (typeof v === "number" ? v : 0);
@@ -113,7 +121,7 @@ export function RunList({
                 title={absoluteTime(r.created_at)}
               >
                 {relativeTime(r.created_at)}
-                {r.trigger ? ` · ${r.trigger}` : ""}
+                {triggerLabel(r.trigger) ? ` · ${triggerLabel(r.trigger)}` : ""}
               </span>
             </button>
           </li>

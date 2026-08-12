@@ -1387,6 +1387,8 @@ export interface components {
             workspace_id: string;
             /** Slack Channel Id */
             slack_channel_id?: string | null;
+            /** Slack Channel Name */
+            slack_channel_name?: string | null;
             /** Title */
             title: string;
             /** Description */
@@ -1440,6 +1442,8 @@ export interface components {
             workspace_id: string;
             /** Slack Channel Id */
             slack_channel_id?: string | null;
+            /** Slack Channel Name */
+            slack_channel_name?: string | null;
             /** Title */
             title: string;
             /** Description */

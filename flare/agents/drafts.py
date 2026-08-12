@@ -52,3 +52,24 @@ class CriticVerdict(BaseModel):
     passed: bool
     reasons: list[str] = Field(default_factory=list)
     downgrade: dict[str, float] = Field(default_factory=dict)
+
+
+#: The three verdicts a claim verification can reach.
+VERDICT_SUPPORTED = "supported"
+VERDICT_CONTRADICTED = "contradicted"
+VERDICT_INCONCLUSIVE = "inconclusive"
+VERIFICATION_VERDICTS = (
+    VERDICT_SUPPORTED,
+    VERDICT_CONTRADICTED,
+    VERDICT_INCONCLUSIVE,
+)
+
+
+class VerificationVerdict(BaseModel):
+    """Whether gathered evidence bears out a specific claim."""
+
+    verdict: str = VERDICT_INCONCLUSIVE
+    rationale: str = ""
+    supports: list[uuid.UUID] = Field(default_factory=list)
+    contradicts: list[uuid.UUID] = Field(default_factory=list)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)

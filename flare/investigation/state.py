@@ -28,6 +28,7 @@ class RunState(TypedDict, total=False):
     mitigations: list[MitigationDraft]
     pending_approvals: list[str]
     approval_decision: dict[str, Any] | None
+    verify_target: dict[str, Any] | None
 
 
 def budget_exceeded(

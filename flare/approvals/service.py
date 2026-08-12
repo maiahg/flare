@@ -158,6 +158,8 @@ async def decide_approval(
                 actor=actor.ref,
                 reason=actor.reason("approved a mitigation proposal"),
             )
+            if incident.mitigated_at is None:
+                incident.mitigated_at = datetime.now(UTC)
 
     from flare.events.outbox import publish_pending
 

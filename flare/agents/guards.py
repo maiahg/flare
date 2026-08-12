@@ -26,8 +26,9 @@ _CONFIG = re.compile(
 )
 #: A mitigation was applied — high-value: it changes the incident's state.
 _MITIGATION = re.compile(
-    r"\b(rolled? back|rollback|reverted?|scaled? (?:up|down)|restarted?|"
-    r"failed over|failover|disabled the flag|drained|hotfix(?:ed)?)\b",
+    r"\b(roll(?:ing|ed)? back|rollback|revert(?:ing|ed)?|scal(?:ing|ed) (?:up|down)|"
+    r"restart(?:ing|ed)?|fail(?:ing|ed) over|failover|disabl(?:ing|ed) the flag|"
+    r"drain(?:ing|ed)|hotfix(?:ing|ed)?|pinn(?:ing|ed))\b",
     re.IGNORECASE,
 )
 #: A human correcting the record — always worth a run.
@@ -43,6 +44,19 @@ _CONTRADICTION = re.compile(
 )
 #: Explicit asks. `/flare investigate|validate` must always trigger.
 _COMMAND = re.compile(r"/flare\s+(investigate|validate)\b", re.IGNORECASE)
+#: A decision reached in-channel — what the team chose to do (or not do).
+_DECISION = re.compile(
+    r"\b(decision:|we (?:decided|agreed|will|'ll)\b|we'?re going to|going with|"
+    r"agreed to|let'?s (?:go with|roll back|proceed with)|call it:)",
+    re.IGNORECASE,
+)
+#: A follow-up task someone owns after the incident.
+_ACTION_ITEM = re.compile(
+    r"\b(action item:?|follow[- ]?up:?|next step:?|to-?do:?|we should\b|"
+    r"someone (?:needs|should|has) to|need to (?:add|create|file|write)|"
+    r"file a (?:ticket|bug|task)|open a (?:ticket|bug|task))",
+    re.IGNORECASE,
+)
 #: Bare symptom language. Weak on its own (it rarely names an artifact you can
 #: query) but it is what a first "something is broken" message looks like.
 _SYMPTOM = re.compile(
@@ -96,4 +110,8 @@ def deterministic_signals(text: str) -> list[ExtractedSignal]:
         add("contradiction", m.group(0))
     for m in _COMMAND.finditer(text):
         add("command", m.group(0))
+    if _DECISION.search(text):
+        add("decision", text)
+    if _ACTION_ITEM.search(text):
+        add("action_item", text)
     return out

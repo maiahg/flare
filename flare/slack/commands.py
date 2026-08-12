@@ -14,7 +14,7 @@ from flare.models.core import (
     Incident,
 )
 from flare.slack import views
-from flare.slack.blocks import ephemeral
+from flare.slack.blocks import ephemeral, in_channel
 from flare.slack.incident_ops import (
     adopt_or_create_incident,
     get_workspace_by_team,
@@ -28,6 +28,7 @@ from flare.worker.enqueue import (
 )
 from flare.worker.enqueue import (
     enqueue_adaptive_run,
+    enqueue_claim_verification,
     enqueue_comms_draft,
     enqueue_correction,
     enqueue_initial_run,
@@ -39,6 +40,19 @@ _TIMELINE_N = 10
 
 _READ_COMMANDS = ("hypotheses", "evidence", "questions", "decisions", "brief",
                   "dashboard", "timeline")
+
+#: Commands answerable via a public `@flare <action>` mention. 
+_MENTION_ACTIONS = frozenset(
+    (*_READ_COMMANDS, "investigate", "validate", "status")
+)
+
+_MENTION_HELP = (
+    "That isn't available via @mention. Use `/flare <action>` for the rest — "
+    "some open a dialog and some stay private on purpose. "
+    "`@flare` supports: `hypotheses`, `evidence`, `questions`, `decisions`, "
+    "`timeline`, `brief`, `dashboard`, `investigate <what>`, "
+    "`validate <claim>`, and `status <state>`."
+)
 
 _USAGE = (
     "Usage: `/flare start \"title\" [--sev sevN] [--desc ...]`, "
@@ -70,6 +84,29 @@ def _ephemeral(text: str) -> dict[str, Any]:
     return ephemeral(text)
 
 
+async def handle_mention(
+    command_text: str,
+    *,
+    channel_id: str,
+    team_id: str = "",
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Run a public `@flare <action>` mention and return what to post in-channel."""
+    action = parse(command_text).action
+    if action not in _MENTION_ACTIONS:
+        return in_channel(_MENTION_HELP)
+    result = await handle(
+        command_text,
+        channel_id=channel_id,
+        team_id=team_id,
+        user_id=user_id,
+        trigger_id=None,
+    )
+    # Force the answer visible to everyone — the whole point of the mention.
+    result["response_type"] = "in_channel"
+    return result
+
+
 def _dashboard_url(incident_id: Any) -> str:
     base = str(get_settings().app_base_url).rstrip("/")
     return f"{base}/incidents/{incident_id}"
@@ -79,6 +116,7 @@ async def handle(
     command_text: str,
     *,
     channel_id: str,
+    channel_name: str | None = None,
     team_id: str = "",
     user_id: str | None = None,
     trigger_id: str | None = None,
@@ -86,12 +124,20 @@ async def handle(
     cmd = parse(command_text)
     if cmd.action == "start":
         return await _handle_start(
-            cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
+            cmd.args,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            team_id=team_id,
+            user_id=user_id,
         )
-    if cmd.action in ("investigate", "validate"):
+    if cmd.action == "investigate":
         return await _handle_investigate(
             cmd.action, cmd.args, channel_id=channel_id, team_id=team_id,
             user_id=user_id,
+        )
+    if cmd.action == "validate":
+        return await _handle_validate(
+            cmd.args, channel_id=channel_id, team_id=team_id, user_id=user_id
         )
     if cmd.action == "mode":
         return await _handle_mode(
@@ -164,7 +210,12 @@ def _parse_start(args: list[str]) -> _StartArgs:
 
 
 async def _handle_start(
-    args: list[str], *, channel_id: str, team_id: str, user_id: str | None
+    args: list[str],
+    *,
+    channel_id: str,
+    channel_name: str | None = None,
+    team_id: str,
+    user_id: str | None,
 ) -> dict[str, Any]:
     parsed = _parse_start(args)
     async with get_sessionmaker()() as session:
@@ -175,6 +226,7 @@ async def _handle_start(
             session,
             workspace_id=workspace.id,
             channel_id=channel_id,
+            channel_name=channel_name,
             title=parsed.title,
             severity=parsed.severity,
             description=parsed.description,
@@ -216,7 +268,7 @@ async def _handle_investigate(
     team_id: str,
     user_id: str | None,
 ) -> dict[str, Any]:
-    """`/flare investigate|validate <text>` — the rule floor's explicit ask"""
+    """`/flare investigate <text>` — the rule floor's explicit ask"""
     focus = " ".join(args).strip()
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel_id, team_id=team_id)
@@ -242,6 +294,37 @@ async def _handle_investigate(
         )
         await service.commit()
     return _ephemeral(f"On it — {action}ing{f' *{focus}*' if focus else ''}…")
+
+
+async def _handle_validate(
+    args: list[str],
+    *,
+    channel_id: str,
+    team_id: str,
+    user_id: str | None,
+) -> dict[str, Any]:
+    """`/flare validate <claim>` — verify one claim against fresh evidence."""
+    claim = " ".join(args).strip()
+    if not claim:
+        return _ephemeral(
+            "Give me a claim to check, e.g. "
+            "`/flare validate the checkout-api deploy caused the p99 spike`."
+        )
+    async with get_sessionmaker()() as session:
+        incident = await incident_for_channel(session, channel_id, team_id=team_id)
+        if incident is None:
+            return _ephemeral(
+                "No flare incident is tracking this channel. Try `/flare start`."
+            )
+        incident_id = incident.id
+    await enqueue_claim_verification(
+        {
+            "incident_id": str(incident_id),
+            "claim": claim,
+            "created_by": slack_actor(user_id or "unknown").ref,
+        }
+    )
+    return _ephemeral(f"Checking that claim against the evidence — *{claim}*…")
 
 
 async def _handle_mode(

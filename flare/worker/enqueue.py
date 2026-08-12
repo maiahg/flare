@@ -59,9 +59,21 @@ async def enqueue_correction(payload: dict[str, Any]) -> None:
     await pool.enqueue_job("reconcile_correction", payload)
 
 
+async def enqueue_mention(payload: dict[str, Any]) -> None:
+    """Answer an `@flare` mention publicly, off the Slack events ack path."""
+    pool = await get_arq_pool()
+    await pool.enqueue_job("handle_mention_job", payload)
+
+
 async def enqueue_adaptive_run(payload: dict[str, Any], *, defer_by: int = 0) -> None:
     """Schedule the coalesced adaptive run ``defer_by`` seconds out"""
     pool = await get_arq_pool()
     await pool.enqueue_job(
         "run_adaptive_investigation", payload, _defer_by=defer_by or None
     )
+
+
+async def enqueue_claim_verification(payload: dict[str, Any]) -> None:
+    """Verify a claim against fresh evidence off the Slack request path."""
+    pool = await get_arq_pool()
+    await pool.enqueue_job("run_claim_verification", payload)

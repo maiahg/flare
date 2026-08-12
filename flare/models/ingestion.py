@@ -38,6 +38,8 @@ SIGNAL_TYPES = (
     "contradiction",
     "correction",
     "command",
+    "decision",
+    "action_item",
 )
 TRIGGER_DECISIONS = ("trigger", "skip", "batch")
 

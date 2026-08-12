@@ -176,6 +176,7 @@ class SteeringService:
                 )
             workspace_id = workspace_ids[0]
 
+        now = datetime.now(UTC)
         incident = Incident(
             workspace_id=workspace_id,
             slack_channel_id=channel_id,
@@ -183,7 +184,8 @@ class SteeringService:
             description=description,
             status="open",
             mode="quiet",
-            started_at=datetime.now(UTC),
+            started_at=now,
+            detected_at=now,
             alert_payload=dict(alert_payload) if alert_payload else None,
             source={"type": "human", "surface": self._actor.surface},
             created_by=self._actor.ref,

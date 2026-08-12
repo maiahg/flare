@@ -3,8 +3,7 @@ import { EmptyState } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { absoluteTime } from "@/lib/format";
 
-type Citation = Record<string, unknown>;
-type Entry = { text?: string; provenance?: Citation[]; at?: string | null };
+type Entry = { text?: string; at?: string | null };
 type Sections = Record<string, unknown>;
 
 function asEntries(value: unknown): Entry[] {
@@ -15,47 +14,13 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function citationLabel(c: Citation): string {
-  if (c.kind === "evidence") {
-    const system = asString(c.system);
-    const title = asString(c.title);
-    return [system ? `[${system}]` : null, title ?? "evidence"]
-      .filter(Boolean)
-      .join(" ");
-  }
-  const entity = asString(c.entity_type) ?? "memory";
-  const author = asString(c.created_by);
-  return author ? `${entity} · ${author}` : entity;
-}
-
-function Citations({ items }: { items?: Citation[] }) {
-  if (!items || items.length === 0) {
-    return (
-      <span className="text-xs text-[var(--warning,#b45309)]">uncited</span>
-    );
-  }
-  return (
-    <span className="flex flex-wrap gap-1.5">
-      {items.map((c, i) => (
-        <span
-          key={i}
-          className="inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-muted,var(--surface))] px-1.5 py-0.5 text-[0.7rem] text-[var(--muted)]"
-          title={c.kind === "evidence" && c.tool_call_id ? `tool call ${String(c.tool_call_id)}` : undefined}
-        >
-          {citationLabel(c)}
-          {c.stale ? " · stale" : ""}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function EntryList({ entries, label }: { entries: Entry[]; label: string }) {
-  if (entries.length === 0)
+  const shown = entries.filter((e) => asString(e.text));
+  if (shown.length === 0)
     return <EmptyState>Nothing recorded for {label.toLowerCase()}.</EmptyState>;
   return (
     <ul aria-label={label} className="m-0 list-none space-y-2.5 p-0">
-      {entries.map((e, i) => (
+      {shown.map((e, i) => (
         <li key={i} className="text-sm">
           <p className="text-[var(--foreground)]/90">
             {e.at ? (
@@ -63,11 +28,8 @@ function EntryList({ entries, label }: { entries: Entry[]; label: string }) {
                 {e.at}
               </span>
             ) : null}
-            {e.text ?? "(no text)"}
+            {e.text}
           </p>
-          <div className="mt-1">
-            <Citations items={e.provenance} />
-          </div>
         </li>
       ))}
     </ul>
@@ -97,12 +59,6 @@ function RootCause({ value }: { value: unknown }) {
       </EmptyState>
     );
   const rc = value as Record<string, unknown>;
-  const provenance = Array.isArray(rc.provenance)
-    ? (rc.provenance as Citation[])
-    : [];
-  const contradicted = Array.isArray(rc.contradicted_by)
-    ? (rc.contradicted_by as Citation[])
-    : [];
   return (
     <div className="text-sm">
       <div className="flex items-start justify-between gap-3">
@@ -111,16 +67,6 @@ function RootCause({ value }: { value: unknown }) {
         </p>
         {asString(rc.status) ? <StatusPill status={String(rc.status)} /> : null}
       </div>
-      <div className="mt-2">
-        <p className="mb-1 text-xs text-[var(--muted)]">Supported by</p>
-        <Citations items={provenance} />
-      </div>
-      {contradicted.length > 0 ? (
-        <div className="mt-2">
-          <p className="mb-1 text-xs text-[var(--muted)]">Contradicted by</p>
-          <Citations items={contradicted} />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -172,9 +118,6 @@ export function PostmortemView({ postmortem }: { postmortem: Postmortem | null }
       {summary?.text ? (
         <Section title="Summary">
           <p className="text-sm text-[var(--foreground)]/90">{summary.text}</p>
-          <div className="mt-1">
-            <Citations items={summary.provenance} />
-          </div>
         </Section>
       ) : null}
 

@@ -34,6 +34,27 @@ class CriticOutput(BaseModel):
     passed: bool
     reasons: list[str] = Field(default_factory=list)
 
+class VerifierOutput(BaseModel):
+    """A verdict on whether gathered evidence bears out one claim."""
+
+    verdict: str = Field(
+        description="exactly one of: supported, contradicted, inconclusive"
+    )
+    rationale: str = Field(
+        description="one to three sentences explaining the verdict from the evidence"
+    )
+    supports_indices: list[int] = Field(
+        default_factory=list,
+        description="indices from the EVIDENCE list that support the claim",
+    )
+    contradicts_indices: list[int] = Field(
+        default_factory=list,
+        description="indices from the EVIDENCE list that contradict the claim",
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0, default=0.5, description="calibrated confidence in the verdict"
+    )
+
 class TriggerOutput(BaseModel):
     decision: str = Field(description="one of: trigger, skip, batch")
     reasons: list[str] = Field(default_factory=list)

@@ -33,6 +33,7 @@ ROLE_TIERS: Mapping[str, str] = {
     "critic": "reasoning",
     "summarizer": "reasoning",
     "mitigation": "reasoning",
+    "verifier": "reasoning",
     "comms": "reasoning",
     "postmortem": "reasoning",
 }
@@ -66,6 +67,7 @@ class LLMModelSettings(BaseModel):
     critic: str = INHERIT_TIER
     summarizer: str = INHERIT_TIER
     mitigation: str = INHERIT_TIER
+    verifier: str = INHERIT_TIER
     comms: str = INHERIT_TIER
     postmortem: str = INHERIT_TIER
 
@@ -181,6 +183,7 @@ class RecoverySettings(BaseModel):
     recovered_ratio: float = 1.5
     degraded_ratio: float = 2.0
     default_service: str | None = None
+    scenario: str | None = None
 
 
 class GovernorSettings(BaseModel):
@@ -203,6 +206,7 @@ class Settings(BaseSettings):
     database_url: PostgresDsn
     redis_url: RedisDsn
     app_base_url: HttpUrl
+    dashboard_base_url: HttpUrl
 
     slack: SlackSettings
     llm: LLMSettings = LLMSettings()

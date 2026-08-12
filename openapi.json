@@ -4290,6 +4290,17 @@
             ],
             "title": "Slack Channel Id"
           },
+          "slack_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slack Channel Name"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -4467,6 +4478,17 @@
               }
             ],
             "title": "Slack Channel Id"
+          },
+          "slack_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slack Channel Name"
           },
           "title": {
             "type": "string",

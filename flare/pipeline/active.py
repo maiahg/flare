@@ -39,7 +39,7 @@ async def _incident_state(
 
 
 def _dashboard_url(incident_id: uuid.UUID) -> str:
-    base = str(get_settings().app_base_url).rstrip("/")
+    base = str(get_settings().dashboard_base_url).rstrip("/")
     return f"{base}/incidents/{incident_id}"
 
 
@@ -167,7 +167,10 @@ async def recovery_watch(ctx: dict, payload: dict[str, Any]) -> str:
         _logger.info("recovery watch stopping: incident is %s", status)
         return "stopped"
 
-    scenario = str(payload.get("scenario", DEFAULT_SCENARIO))
+    scenario = (
+        settings.recovery.scenario
+        or str(payload.get("scenario", DEFAULT_SCENARIO))
+    )
     async with get_sessionmaker()() as session:
         service = payload.get("service") or await infer_service(
             session,

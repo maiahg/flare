@@ -65,7 +65,7 @@ async def start_initial_run(
         return run_id
         
     if not dashboard_url:
-        base = str(settings.app_base_url).rstrip("/")
+        base = str(settings.dashboard_base_url).rstrip("/")
         dashboard_url = f"{base}/incidents/{incident_id}"
 
     deps = GraphDeps(

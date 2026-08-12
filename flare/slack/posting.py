@@ -108,6 +108,26 @@ class InvestigationSlackPoster:
         )
         await self._announce("findings")
 
+    async def post_verdict(
+        self, *, claim: str, verdict: str, rationale: str, dashboard_url: str
+    ) -> None:
+        """Post a claim-verification verdict."""
+        if not self._may_post():
+            return
+        icon = {
+            "supported": ":white_check_mark: *Verified*",
+            "contradicted": ":x: *Contradicted*",
+            "inconclusive": ":grey_question: *Inconclusive*",
+        }.get(verdict, f"*{verdict}*")
+        lines = [f"{icon}: {claim}"]
+        if rationale:
+            lines.append(rationale)
+        lines.append(f"<{dashboard_url}|Full investigation →>")
+        await self._poster.post_message(
+            self._channel, "\n".join(lines), thread_ts=self._thread_ts
+        )
+        await self._announce("verdict")
+
     async def post_approval(
         self, *, blocks: list[dict[str, Any]], text: str
     ) -> None:

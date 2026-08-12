@@ -15,11 +15,17 @@ from flare.agents.critic import CriticAgent
 from flare.agents.hypothesis import HypothesisAgent
 from flare.agents.mitigation import MitigationAgent
 from flare.agents.read import CodeAgent, DeployAgent, ImpactAgent, TelemetryAgent
+from flare.agents.drafts import VerificationVerdict
 from flare.agents.summarizer import SummarizerAgent
+from flare.agents.verifier import VerifierAgent
 from flare.approvals import SUBJECT_MITIGATION, create_approval
 from flare.config import LLMModelSettings, MitigationSettings, RunBudgetSettings
 from flare.events.outbox import commit_and_publish
-from flare.investigation.commit import commit_memory, commit_mitigations
+from flare.investigation.commit import (
+    commit_memory,
+    commit_mitigations,
+    commit_verification,
+)
 from flare.investigation.recorder import RunRecorder
 from flare.investigation.state import RunState, budget_exceeded
 from flare.llm import LLMClient
@@ -33,6 +39,9 @@ class InvestigationPoster(Protocol):
     async def post_intent(self, checking: list[str]) -> None: ...
     async def post_findings(
         self, *, summary: str | None, top_hypothesis: str | None, dashboard_url: str
+    ) -> None: ...
+    async def post_verdict(
+        self, *, claim: str, verdict: str, rationale: str, dashboard_url: str
     ) -> None: ...
 
 
@@ -215,6 +224,47 @@ def build_investigation_graph(
     async def revise(state: RunState) -> RunState:
         return {"revision_count": state.get("revision_count", 0) + 1}
 
+    async def verify(state: RunState) -> RunState:
+        await checkpoint()
+        target = state.get("verify_target") or {}
+        claim = str(target.get("statement") or state["plan"].get("focus") or "")
+        async with deps.recorder.agent_step("VerifierAgent", 9) as step:
+            agent = VerifierAgent(deps.llm, model=deps.models.verifier)
+            try:
+                verdict = await agent.run(
+                    claim=claim, evidence=state.get("evidence", [])
+                )
+            except RateLimitedError as exc:
+                verdict = VerificationVerdict(
+                    verdict="inconclusive",
+                    rationale=f"verification skipped: rate limited ({exc})",
+                    confidence=0.0,
+                )
+                step.error = "rate limited"
+            step.output = {
+                "verdict": verdict.verdict,
+                "confidence": verdict.confidence,
+                "supports": len(verdict.supports),
+                "contradicts": len(verdict.contradicts),
+            }
+            step.record_usage(agent.usage, fallback_model=deps.models.verifier)
+        summary = await commit_verification(
+            deps.sessionmaker,
+            run_id=uuid.UUID(state["run_id"]),
+            incident_id=uuid.UUID(state["incident_id"]),
+            evidence=state.get("evidence", []),
+            target=target,
+            verdict=verdict,
+        )
+        if deps.poster is not None:
+            await deps.poster.post_verdict(
+                claim=claim,
+                verdict=verdict.verdict,
+                rationale=verdict.rationale,
+                dashboard_url=deps.dashboard_url,
+            )
+        return {"summary": summary}
+
     async def commit_node(state: RunState) -> RunState:
         await checkpoint()
         verdict = state.get("critic_verdict")
@@ -367,6 +417,8 @@ def build_investigation_graph(
         return {}
 
     def route_after_gather(state: RunState) -> str:
+        if state.get("verify_target"):
+            return "verify"
         return "commit" if state.get("truncated") else "hypothesis"
 
     def route_mitigation(state: RunState) -> str:
@@ -399,6 +451,7 @@ def build_investigation_graph(
         g.add_node(read_name, node_impls[read_name])
     g.add_node("gather_join", gather_join)
     g.add_node("hypothesis", hypothesis)
+    g.add_node("verify", verify)
     g.add_node("summarizer", summarizer)
     g.add_node("critic", critic)
     g.add_node("revise", revise)
@@ -420,8 +473,13 @@ def build_investigation_graph(
     g.add_conditional_edges(
         "gather_join",
         route_after_gather,
-        {"hypothesis": "hypothesis", "commit": "commit_memory"},
+        {
+            "hypothesis": "hypothesis",
+            "commit": "commit_memory",
+            "verify": "verify",
+        },
     )
+    g.add_edge("verify", "persist_run")
     g.add_edge("hypothesis", "summarizer")
     g.add_edge("summarizer", "critic")
     g.add_conditional_edges(

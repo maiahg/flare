@@ -43,9 +43,11 @@ Slack must reach the backend over HTTPS → run a tunnel (cloudflared/ngrok) to 
    DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5433/vectordb
    REDIS_URL=redis://localhost:6379/0
    APP_BASE_URL=http://localhost:8000        # becomes the tunnel URL in Part B
+   DASHBOARD_BASE_URL=http://localhost:3000  # dashboard links stay on :3000
    LLM__PROVIDER__API_KEY=sk-or-...          # double underscore!
    TOOLS__PROVIDER=synthetic
    MITIGATION__ENABLED=true
+   RECOVERY__SCENARIO=orders_backlog_recovered  # post-mitigation telemetry
    SLACK__SIGNING_SECRET=...                 # Part B
    SLACK__CLIENT_ID=...
    SLACK__CLIENT_SECRET=...
@@ -172,8 +174,10 @@ you ask (a read command, `/flare investigate|validate`, or `/flare mode assist`
 to turn on proactive posting). Nothing happens without a command — inviting the
 bot to a channel no longer opens an incident on its own.
 
-**Beat 2 — The team piles in with context** (each line becomes a cited fact /
-timeline entry, and can trigger a re-investigation):
+**Beat 2 — The team piles in with context** (each line becomes cited memory —
+facts, decisions, action items — and can trigger a re-investigation; only
+consequential events like deploys and mitigations land on the timeline, not
+every message):
 ```
 sam:   Order success on the checkout dashboard fell 99.3% → 71% starting 02:16. Customers see a "pending" spinner.
 rey:   Heads up — I ramped async_order_confirmation 0 → 100 at 02:15. Could be us. Want me to roll it back?
@@ -188,6 +192,13 @@ priya:  /flare hypotheses
 priya:  /flare evidence
 priya:  /flare timeline
 ```
+
+> **Private vs public:** `/flare <action>` answers you *privately* (ephemeral —
+> only you see it). To broadcast an answer so the whole channel sees it, mention
+> the bot instead: `@flare hypotheses`, `@flare validate "…"`, `@flare status
+> resolved`. `@flare` supports reads, `investigate`/`validate`, and `status`;
+> everything else (start, mode, correct, mitigation, draft-update, postmortem)
+> stays on `/flare` — some open a dialog, which a mention can't do.
 → leading hypothesis: **deploy #7788 shrank the orders-worker Redis connection
 pool 25→5**; evidence is the pool-exhaustion logs + blame on `redis.rb`;
 payments is healthy; the flag ramp and CSS deploy are noted but not causal.
@@ -218,8 +229,22 @@ priya:  /flare mitigation
 `ConnectionPool` size to 25). **Click Approve** on the top one — nothing is
 applied automatically; approval records intent only.
 ```
+priya:  Decision: we're rolling back #7788 and pinning the orders-worker Redis pool back to 25 as the fix.
 omar:   Rolling back #7788 and pinning pool size back to 25.
 ```
+→ Scribe records both as **decisions** on the incident (the rollback also lands
+on the timeline as a mitigation). Read them back with `/flare decisions`.
+
+**Beat 6b — Capture follow-ups** (each becomes a postmortem action item):
+```
+sam:    Action item: add a pool-size regression test so a redis-rb bump can't silently shrink the pool again.
+priya:  Follow-up: we should alert on orders-worker queue depth > 1000 so we catch this earlier next time.
+rey:    To-do: document the async_order_confirmation ramp coincidence in the runbook so we don't chase that decoy again.
+```
+→ Scribe records these as **action items** — they surface in the postmortem's
+follow-ups section and on the dashboard. (Decisions and action items are also
+extracted by the LLM scribe from natural phrasing; the `decision:` / `action
+item:` / `follow-up:` prefixes above just make them deterministic for the demo.)
 
 **Beat 7 — Confirm the hypothesis**
 Click **Confirm** on the #7788 hypothesis card (drives ranking and locks the
@@ -232,25 +257,37 @@ priya:  /flare draft-update status
 → editable modal; pick the **status** audience (external-safe: never shows
 unconfirmed hypotheses). Edit and submit.
 
-**Beat 9 — Recovery + lifecycle** (manual in a Slack-only demo — the synthetic
-scenario stays elevated, so you narrate recovery and move status by hand):
+**Beat 9 — Recovery + lifecycle**
+Approving a mitigation (Beat 6/7) schedules a read-only **recovery watch**. With
+`RECOVERY__SCENARIO=orders_backlog_recovered` set, that poll reads the
+post-mitigation telemetry (p99 drained back to baseline), so the watcher observes
+recovery on its own: it flips the incident to `monitoring` and records a
+metrics-sourced **`Recovery observed: …`** entry on the timeline (a real event
+from a tool call, not something anyone typed). If you leave `RECOVERY__SCENARIO`
+unset the investigation scenario stays elevated and you narrate recovery by hand.
 ```
 sam:    Queue is draining — success back to 98% at 02:41, orders-worker throughput recovering.
-priya:  /flare status mitigating
 priya:  /flare status monitoring
 priya:  /flare status resolved
 ```
+> The timeline is a log of **consequential events**, not a chat transcript: the
+> only entries are deploys (e.g. `omar` shipping / rolling back #7788),
+> mitigations, and the recovery observation above. Read it with `/flare
+> timeline`; it also renders in the postmortem's Timeline section.
 
 **Beat 10 — Postmortem**
 ```
 priya:  /flare postmortem
 ```
 → drafted from memory; every claim cited; root cause = the human-confirmed #7788
-pool shrink. Optional: `/flare mode active` earlier to show proactive refresh.
+pool shrink. The **Decisions** section carries the rollback/pool-pin decisions
+from Beat 6 and the **Action items** section carries the three follow-ups from
+Beat 6b. Optional: `/flare mode active` earlier to show proactive refresh.
 
 **Dashboard:** keep http://localhost:3000 open on the incident throughout —
-hypotheses, evidence, timeline, mitigations, comms and the postmortem all update
-live, each linking back to the tool call or human message that produced it.
+overview, runs, evidence, hypotheses and the postmortem all update live. (The
+standalone Timeline tab was removed; the timeline of consequential events now
+lives in the postmortem's Timeline section.)
 
 ### Command reference
 `start`, `investigate <what>`, `validate <claim>`, `correct "..."`,

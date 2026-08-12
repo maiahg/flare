@@ -86,8 +86,8 @@ async def start_adaptive_run(
     dashboard_url: str = "",
     run_type: str = "adaptive",
     agents: Sequence[str] | None = None,
+    verify_target: dict[str, Any] | None = None,
 ) -> uuid.UUID:
-    """Plan and execute a targeted adaptive run; return the run id."""
     settings = get_settings()
     sessionmaker = get_sessionmaker()
     redis = get_redis()
@@ -97,7 +97,7 @@ async def start_adaptive_run(
     recorder = RunRecorder(
         sessionmaker,
         incident_id=incident_id,
-        run_type="run_type",
+        run_type=run_type,
         trigger=trigger,
         created_by=created_by,
         scenario=scenario,
@@ -172,6 +172,7 @@ async def start_adaptive_run(
         "hypotheses": [],
         "limitations": [],
         "revision_count": 0,
+        "verify_target": verify_target,
     }
 
     config = {"configurable": {"thread_id": str(run_id)}}

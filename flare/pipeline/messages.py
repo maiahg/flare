@@ -14,7 +14,13 @@ from flare.db.session import get_sessionmaker
 from flare.events.outbox import commit_and_publish
 from flare.llm import get_llm_client
 from flare.memory import MemoryRepository
-from flare.models.claims import Decision, Fact, OpenQuestion, TimelineEntry
+from flare.models.claims import (
+    ActionItem,
+    Decision,
+    Fact,
+    OpenQuestion,
+    TimelineEntry,
+)
 from flare.models.core import Incident
 from flare.models.ingestion import SlackMessage
 from flare.models.provenance import HUMAN_STATEMENT_KIND
@@ -105,6 +111,8 @@ async def process_message(ctx: dict, payload: dict[str, Any]) -> str:
             await repo.create(OpenQuestion, **common, **q)
         for d in plan.decisions:
             await repo.create(Decision, **common, **d)
+        for a in plan.action_items:
+            await repo.create(ActionItem, **common, **a)
 
         # ---- adaptive triage: novelty -> trigger decision -> coalesce window
         triage = await triage_message(

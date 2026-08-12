@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from typing import Any
 from urllib.parse import parse_qs
@@ -14,10 +15,16 @@ from flare.redis import get_redis
 from flare.slack import oauth, commands as slack_commands
 from flare.slack.dedupe import mark_seen
 from flare.slack.events import is_bot_message, normalize_event_callback
-from flare.slack.incident_ops import incident_for_channel
+from flare.slack.incident_ops import (
+    bot_user_id,
+    get_workspace_by_team,
+    incident_for_channel,
+)
 from flare.slack.interactions import handle_interaction
 from flare.slack.signature import is_valid_signature
-from flare.worker.enqueue import enqueue_message
+from flare.worker.enqueue import enqueue_mention, enqueue_message
+
+_MENTION_RE = re.compile(r"<@[^>]+>")
 
 router = APIRouter(prefix="/slack", tags=["slack"])
 
@@ -48,6 +55,23 @@ async def _incident_for_channel(team_id: str, channel: str | None) -> uuid.UUID 
     async with get_sessionmaker()() as session:
         incident = await incident_for_channel(session, channel, team_id=team_id)
         return incident.id if incident is not None else None
+
+
+def _strip_mentions(text: str | None) -> str:
+    """Drop `<@U…>` mention tokens, leaving the command text."""
+    return _MENTION_RE.sub("", text or "").strip()
+
+
+async def _is_bot_directed(team_id: str, text: str | None) -> bool:
+    """True if the message leads with an @-mention of the flare bot."""
+    if not text or "<@" not in text:
+        return False
+    async with get_sessionmaker()() as session:
+        workspace = await get_workspace_by_team(session, team_id)
+        if workspace is None:
+            return False
+        bot_id = bot_user_id(workspace)
+    return bool(bot_id) and text.lstrip().startswith(f"<@{bot_id}>")
 
 @router.post("/events")
 async def slack_events(request: Request) -> dict[str, Any]:
@@ -84,7 +108,28 @@ async def slack_events(request: Request) -> dict[str, Any]:
                 "channel": internal.channel,
             },
         )
+        if (
+            internal.event_type == "app_mention"
+            and internal.channel
+            and (internal.text or "").lstrip().startswith("<@")
+        ):
+            command = _strip_mentions(internal.text)
+            if command:
+                await enqueue_mention(
+                    {
+                        "channel": internal.channel,
+                        "team_id": internal.team_id,
+                        "user_id": internal.user,
+                        "text": command,
+                    }
+                )
+            return {"ok": True, "status": "accepted"}
+
         if internal.event_type == 'message' and internal.text:
+            # A message that mentions the bot is a command (handled above via
+            # app_mention), not incident context — don't scribe it.
+            if await _is_bot_directed(internal.team_id, internal.text):
+                return {"ok": True, "status": "accepted"}
             incident_id = await _incident_for_channel(internal.team_id, internal.channel)
             if incident_id is not None:
                 await enqueue_message(
@@ -110,6 +155,7 @@ async def slack_commands_route(request: Request) -> dict[str, Any]:
     command = form.get("command", [""])[0]
     text = form.get("text", [""])[0]
     channel_id = form.get("channel_id", [""])[0]
+    channel_name = form.get("channel_name", [""])[0] or None
     team_id = form.get("team_id", [""])[0]
     user_id = form.get("user_id", [""])[0] or None
     trigger_id = form.get("trigger_id", [""])[0] or None
@@ -118,6 +164,7 @@ async def slack_commands_route(request: Request) -> dict[str, Any]:
         return await slack_commands.handle(
             text,
             channel_id=channel_id,
+            channel_name=channel_name,
             team_id=team_id,
             user_id=user_id,
             trigger_id=trigger_id,

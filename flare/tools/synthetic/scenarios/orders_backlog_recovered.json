@@ -1,0 +1,45 @@
+{
+  "name": "orders_backlog_recovered",
+  "primary_service": "checkout-api",
+  "incident_summary": "Post-mitigation snapshot of the orders_backlog incident: deploy #7788 was rolled back and the orders-worker Redis ConnectionPool was pinned back to 25. Telemetry shows the p99 spike draining back to its pre-incident baseline across checkout-api and orders-worker.",
+  "_note": "Companion to orders_backlog.json. This is the SAME incident, read AFTER the rollback of #7788. The metric series carry the full arc — pre-incident baseline, the spike, and the return to baseline — so RecoveryWatcher.assess() reports recovery (peak >= baseline*degraded_ratio, latest <= baseline*recovered_ratio). Point the recovery watch at this scenario with RECOVERY__SCENARIO=orders_backlog_recovered so a post-mitigation poll records a metrics-sourced 'Recovery observed' timeline entry instead of the operator narrating it by hand.",
+  "metrics": {
+    "checkout-api": {
+      "p99_ms": { "02:10": 240, "02:14": 250, "02:16": 610, "02:20": 1180, "02:28": 1320, "02:36": 1360, "02:44": 940, "02:50": 470, "02:56": 262, "03:02": 248 },
+      "error_rate": { "02:10": 0.4, "02:14": 0.5, "02:16": 2.1, "02:20": 5.6, "02:28": 8.9, "02:36": 9.4, "02:44": 4.2, "02:50": 1.1, "02:56": 0.5, "03:02": 0.4 },
+      "throughput_rps": { "02:10": 322, "02:14": 318, "02:16": 300, "02:20": 258, "02:28": 224, "02:36": 212, "02:44": 268, "02:50": 305, "02:56": 320, "03:02": 323 }
+    },
+    "orders-worker": {
+      "p99_ms": { "02:10": 210, "02:14": 225, "02:16": 4200, "02:20": 28000, "02:28": 51000, "02:36": 60000, "02:44": 9200, "02:50": 820, "02:56": 240, "03:02": 216 },
+      "error_rate": { "02:10": 0.2, "02:14": 0.3, "02:16": 6.7, "02:20": 14.2, "02:28": 21.8, "02:36": 23.5, "02:44": 5.1, "02:50": 0.9, "02:56": 0.3, "03:02": 0.2 },
+      "throughput_rps": { "02:10": 305, "02:14": 300, "02:16": 96, "02:20": 41, "02:28": 19, "02:36": 12, "02:44": 140, "02:50": 268, "02:56": 300, "03:02": 306 }
+    },
+    "payments-gateway": {
+      "p99_ms": { "01:56": 190, "01:58": 470, "02:02": 205, "02:16": 198, "02:28": 201, "02:36": 199, "03:02": 197 },
+      "error_rate": { "01:56": 0.3, "01:58": 1.1, "02:02": 0.3, "02:16": 0.2, "02:28": 0.3, "02:36": 0.2, "03:02": 0.2 },
+      "throughput_rps": { "01:56": 140, "01:58": 138, "02:02": 141, "02:16": 139, "02:28": 140, "02:36": 141, "03:02": 140 }
+    },
+    "web-storefront": {
+      "p99_ms": { "02:10": 88, "02:16": 90, "02:20": 87, "02:28": 89, "02:36": 88, "03:02": 88 },
+      "error_rate": { "02:10": 0.1, "02:16": 0.1, "02:20": 0.1, "02:28": 0.2, "02:36": 0.1, "03:02": 0.1 },
+      "throughput_rps": { "02:10": 410, "02:16": 408, "02:20": 412, "02:28": 409, "02:36": 411, "03:02": 410 }
+    }
+  },
+  "logs": [
+    { "at": "02:50", "service": "orders-worker", "level": "info", "text": "connection pool restored to 25; 0 threads waiting, queue drained to 0 jobs", "count": 1 },
+    { "at": "02:49", "service": "orders-worker", "level": "info", "text": "redis-rb rolled back to 4.8 (deploy #7788 reverted); ConnectionPool size 5 -> 25", "count": 1 },
+    { "at": "02:51", "service": "checkout-api", "level": "info", "text": "order_confirmation enqueue latency back under 40ms; success rate 98.6%", "count": 1 }
+  ],
+  "deploys": [
+    {
+      "id": "7791",
+      "service": "orders-worker",
+      "at": "02:47",
+      "author": "@dev-omar",
+      "diff_summary": "revert #7788: pin redis-rb 4.8 and restore ConnectionPool size 25, checkout_timeout 1s",
+      "files": ["Gemfile.lock", "config/initializers/redis.rb"]
+    }
+  ],
+  "flags": [],
+  "history": []
+}

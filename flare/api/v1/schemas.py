@@ -43,6 +43,7 @@ class IncidentRead(ORMModel):
     id: uuid.UUID
     workspace_id: uuid.UUID
     slack_channel_id: str | None = None
+    slack_channel_name: str | None = None
     title: str
     description: str | None = None
     status: str

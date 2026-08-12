@@ -61,6 +61,7 @@ async def adopt_or_create_incident(
     *,
     workspace_id: uuid.UUID,
     channel_id: str,
+    channel_name: str | None = None,
     title: str,
     severity: str = "unknown",
     description: str | None = None,
@@ -74,21 +75,27 @@ async def adopt_or_create_incident(
         )
     )
     if incident is None:
+        now = datetime.now(UTC)
         incident = Incident(
             workspace_id=workspace_id,
             slack_channel_id=channel_id,
+            slack_channel_name=channel_name,
             title=title,
             description=description,
             severity=severity,
             mode="quiet",
             status="open",
-            started_at=datetime.now(UTC),
+            started_at=now,
+            detected_at=now,
+            source={"type": "slack", "surface": "command", "channel": channel_id},
             created_by=created_by,
         )
         session.add(incident)
     else:
         if title:
             incident.title = title
+        if channel_name and incident.slack_channel_name != channel_name:
+            incident.slack_channel_name = channel_name
     await session.commit()
     await session.refresh(incident)
     return incident

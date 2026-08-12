@@ -57,3 +57,13 @@ class GovernedPoster:
         _logger.info(
             "findings post suppressed", extra={"reason": decision.reason}
         )
+
+    async def post_verdict(
+        self, *, claim: str, verdict: str, rationale: str, dashboard_url: str
+    ) -> None:
+        await self._inner.post_verdict(
+            claim=claim,
+            verdict=verdict,
+            rationale=rationale,
+            dashboard_url=dashboard_url,
+        )

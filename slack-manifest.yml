@@ -18,12 +18,14 @@ oauth_config:
       - chat:write
       - channels:history
       - channels:read
+      - app_mentions:read
 settings:
   event_subscriptions:
     request_url: https://holder-bits-usc-dui.trycloudflare.com/slack/events
     bot_events:
       - message.channels
       - member_joined_channel
+      - app_mention
   interactivity:
     is_enabled: true
     request_url: https://holder-bits-usc-dui.trycloudflare.com/slack/interactions

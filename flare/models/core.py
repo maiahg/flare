@@ -81,6 +81,9 @@ class Incident(UUIDAuditMixin, Base):
     slack_channel_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True, index=True
     )
+    slack_channel_name: Mapped[str | None] = mapped_column(
+        String(255), nullable=True
+    )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -16,7 +16,7 @@ _logger = logging.getLogger("flare.pipeline.comms")
 
 
 def _dashboard_url(incident_id: uuid.UUID) -> str:
-    base = str(get_settings().app_base_url).rstrip("/")
+    base = str(get_settings().dashboard_base_url).rstrip("/")
     return f"{base}/incidents/{incident_id}"
 
 

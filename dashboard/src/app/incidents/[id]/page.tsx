@@ -11,7 +11,6 @@ import { RunDetailView, RunList } from "@/components/RunTrace";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { INCIDENT_TABS, type IncidentTab } from "@/components/shell/Sidebar";
 import { TokenUsagePanel } from "@/components/TokenUsage";
-import { Timeline } from "@/components/Timeline";
 import { EmptyState, Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { relativeTime } from "@/lib/format";
@@ -22,7 +21,6 @@ import {
   usePostmortem,
   useRun,
   useRuns,
-  useTimeline,
   useUsage,
 } from "@/lib/hooks";
 import { useIncidentStream } from "@/lib/useIncidentStream";
@@ -55,7 +53,6 @@ function IncidentView({ id }: { id: string }) {
   useIncidentStream(id);
 
   const incident = useIncident(id);
-  const timeline = useTimeline(id);
   const runs = useRuns(id);
   const run = useRun(id, selectedRun);
   const evidence = useEvidence(id);
@@ -129,12 +126,6 @@ function IncidentView({ id }: { id: string }) {
         ) : null}
 
         {tab === "overview" && data ? <IncidentOverview incident={data} /> : null}
-
-        {tab === "timeline" ? (
-          <Panel title="Timeline">
-            <Timeline entries={timeline.data ?? []} />
-          </Panel>
-        ) : null}
 
         {tab === "runs" ? (
           <div className="grid items-start gap-5 lg:grid-cols-[280px_1fr]">

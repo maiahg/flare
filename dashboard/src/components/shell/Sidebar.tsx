@@ -8,7 +8,6 @@ import {
   ActivityIcon,
   AlertIcon,
   BulbIcon,
-  ClockIcon,
   DocumentIcon,
   EvidenceIcon,
   GridIcon,
@@ -19,7 +18,6 @@ import {
 
 export const INCIDENT_TABS = [
   ["overview", "Overview", ActivityIcon],
-  ["timeline", "Timeline", ClockIcon],
   ["runs", "Runs", RunsIcon],
   ["evidence", "Evidence", EvidenceIcon],
   ["hypotheses", "Hypotheses", BulbIcon],
