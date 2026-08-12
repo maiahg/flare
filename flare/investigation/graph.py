@@ -15,7 +15,6 @@ from flare.agents.critic import CriticAgent
 from flare.agents.hypothesis import HypothesisAgent
 from flare.agents.mitigation import MitigationAgent
 from flare.agents.read import CodeAgent, DeployAgent, ImpactAgent, TelemetryAgent
-from flare.agents.read.base import DEFAULT_SERVICE, DEFAULT_SUSPECT_SERVICE
 from flare.agents.summarizer import SummarizerAgent
 from flare.approvals import SUBJECT_MITIGATION, create_approval
 from flare.config import LLMModelSettings, MitigationSettings, RunBudgetSettings
@@ -61,11 +60,10 @@ class GraphDeps:
     budget_started: float
     dashboard_url: str = ""
     poster: InvestigationPoster | None = None
-    #: Checked at each checkpoint; truthy → abandon the run as superseded.
     cancelled: Callable[[], Awaitable[bool]] | None = None
-    #: §11.6 mitigation proposals + the §7.6 approval interrupt.
     mitigation: MitigationSettings = field(default_factory=MitigationSettings)
     approval_poster: ApprovalPoster | None = None
+    default_service: str | None = None
 
 
 #: Graph node name -> read-agent class, in fan-out order.
@@ -79,7 +77,7 @@ READ_AGENTS = {
 
 def build_investigation_graph(
     deps: GraphDeps, *, read_agents: Sequence[str] | None = None
-):  # noqa: ANN201 - langgraph CompiledGraph
+):
     """Assemble + compile an investigation graph for one run.
 
     ``read_agents`` selects the fan-out (default: all four). Unknown names are
@@ -95,21 +93,14 @@ def build_investigation_graph(
             raise RunSuperseded
 
     async def extract_context(state: RunState) -> RunState:
-        # An adaptive run arrives with the planner's plan already in state; only
-        # synthesize the default sweep when nothing planned this run.
         if state.get("plan"):
             return {"revision_count": 0}
         trigger = state.get("trigger", {})
-        # The trigger is the only place that knows which service this incident
-        # is about — incidents carry no service column (§3.2), so whoever
-        # starts a run passes it (an alert payload, a `/flare start`, the eval
-        # corpus). The demo-world names remain the fallback.
+        service = trigger.get("service") or deps.default_service
         plan = {
-            "service": trigger.get("service") or DEFAULT_SERVICE,
+            "service": service,
             "deploy_id": trigger.get("deploy_id"),
-            "suspect_service": (
-                trigger.get("suspect_service") or DEFAULT_SUSPECT_SERVICE
-            ),
+            "suspect_service": trigger.get("suspect_service") or service,
             "checking": ["metrics", "deploys", "code", "impact"],
         }
         return {"plan": plan, "revision_count": 0}
@@ -127,12 +118,6 @@ def build_investigation_graph(
                 try:
                     drafts = await agent.run(plan=state["plan"])
                 except RateLimitedError as exc:
-                    # The provider's limits are shared across the fan-out and the
-                    # rest of the platform, so this is a capacity condition, not
-                    # a bug in the investigation. One agent losing its model is
-                    # a partial read — exactly what `limitations` is for — and
-                    # killing the run over it would throw away the three agents
-                    # that succeeded (§10.3).
                     drafts = []
                     agent.limitations = [
                         f"{name}: LLM rate limited, findings not summarized ({exc})"
@@ -143,10 +128,6 @@ def build_investigation_graph(
                     "limitations": agent.limitations,
                 }
                 step.record_usage(agent.usage, fallback_model=deps.models.default)
-        # Degraded reads travel with the run, not just the trace: persist_run
-        # writes state limitations onto investigation_runs, which is what the
-        # dashboard and the postmortem show. Without this a total backend
-        # outage would produce a confident-looking run that saw nothing (§10.3).
         return {"evidence": drafts, "limitations": agent.limitations}
 
     async def telemetry(state: RunState) -> RunState:
@@ -196,11 +177,6 @@ def build_investigation_graph(
                     previous=state.get("hypotheses", []),
                 )
             except RateLimitedError as exc:
-                # Without hypotheses there is nothing to rank, but the evidence
-                # the read agents gathered is real and still worth committing:
-                # a channel that gets cited observations and "we could not
-                # reason over them yet" is better served than one that gets a
-                # failed run. `truncated` sends the graph straight to commit.
                 hyps = []
                 step.error = "rate limited"
                 step.output = {"hypotheses": 0}
@@ -240,8 +216,6 @@ def build_investigation_graph(
         return {"revision_count": state.get("revision_count", 0) + 1}
 
     async def commit_node(state: RunState) -> RunState:
-        # Last checkpoint before memory is written: a superseded run must not
-        # commit, or the replacement run would duplicate its evidence (§7.5).
         await checkpoint()
         verdict = state.get("critic_verdict")
         extra: list[str] = []
@@ -292,9 +266,6 @@ def build_investigation_graph(
                     summary=state.get("summary"),
                 )
             except Exception as exc:  # noqa: BLE001 - degrade; the run is done
-                # This node runs after the investigation is committed and
-                # posted. Failing here must not retroactively fail a run whose
-                # findings are already durable (§10.3) — it costs the proposals.
                 step.error = str(exc)
                 drafts = []
             step.output = {
@@ -319,12 +290,6 @@ def build_investigation_graph(
         return {"mitigations": drafts, "pending_approvals": gated}
 
     async def approval_gate(state: RunState) -> RunState:
-        """Block this branch on a human decision (§7.6).
-
-        Everything before ``interrupt`` re-executes when the branch is resumed,
-        which is why opening an approval is get-or-create: a second Approve
-        click must not open a second approval for the same option.
-        """
         gated = state.get("pending_approvals", [])
         if not gated:
             return {}
@@ -349,8 +314,6 @@ def build_investigation_graph(
         if deps.approval_poster is not None:
             await _post_approval_cards(state, approvals)
 
-        # Blocks here. The run row is already `done` (persist_run ran first), so
-        # a pending approval never strands the run.
         decision = interrupt(
             {
                 "kind": "mitigation_approval",
@@ -391,16 +354,10 @@ def build_investigation_graph(
                     ),
                     text=f"Approval needed: {draft.title}",
                 )
-            except Exception:  # noqa: BLE001 - the approval exists either way
+            except Exception: 
                 pass
 
     async def record_decision(state: RunState) -> RunState:
-        """Close the branch after a human decided (§11.2: recorded, not applied).
-
-        The decision is already durable — the approvals service committed it
-        before resuming. This only notes the outcome on the run so the trace
-        shows why the branch stopped and what released it.
-        """
         decision = state.get("approval_decision") or {}
         if decision:
             await deps.recorder.add_limitation(
@@ -487,6 +444,5 @@ def build_investigation_graph(
     return g.compile(checkpointer=MemorySaver())
 
 
-def build_initial_graph(deps: GraphDeps):  # noqa: ANN201 - langgraph CompiledGraph
-    """The §7.3 initial graph: full fan-out over all four read agents."""
+def build_initial_graph(deps: GraphDeps):
     return build_investigation_graph(deps)

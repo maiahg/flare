@@ -21,9 +21,6 @@ absent, or normal from a read that failed — say what you saw, and nothing abou
 what you could not see. Return findings matching the schema."""
 
 
-DEFAULT_SERVICE = "checkout-api"
-DEFAULT_SUSPECT_SERVICE = "payments-svc"
-
 def has_content(data: dict[str, Any]) -> bool:
     for value in data.values():
         if isinstance(value, (list, dict, tuple, set)) and value:
@@ -33,14 +30,13 @@ def has_content(data: dict[str, Any]) -> bool:
     return False
 
 
-def plan_service(plan: dict[str, Any]) -> str:
-    return str(plan.get("service") or DEFAULT_SERVICE)
+def plan_service(plan: dict[str, Any]) -> str | None:
+    return plan.get("service") or None
 
 
-def plan_suspect_service(plan: dict[str, Any]) -> str:
-    return str(
-        plan.get("suspect_service") or plan.get("service") or DEFAULT_SUSPECT_SERVICE
-    )
+def plan_suspect_service(plan: dict[str, Any]) -> str | None:
+    """The service to blame-read, falling back to the incident's own service."""
+    return plan.get("suspect_service") or plan.get("service") or None
 
 @dataclass(frozen=True)
 class Probe:
@@ -64,6 +60,12 @@ class ReadAgent:
         self._model = model
         self.usage = LLMUsage()
         self.limitations: list[str] = []
+        self.skipped: list[str] = []
+
+    def skip(self, reason: str) -> list[Probe]:
+        """Record why a service-keyed read was declined; return no probes."""
+        self.skipped.append(reason)
+        return []
 
     async def gather(self, plan: dict[str, Any]) -> list[Probe]:
         """Make the broker calls this agent needs. Override in subclasses."""
@@ -72,8 +74,9 @@ class ReadAgent:
     async def run(
         self, *, plan: dict[str, Any], memory_snapshot: dict[str, Any] | None = None
     ) -> list[EvidenceDraft]:
+        self.skipped = []
         probes = await self.gather(plan)
-        self.limitations = [
+        self.limitations = list(self.skipped) + [
             f"{p.brokered.result.system}: {limit} (query: {p.query})"
             for p in probes
             for limit in p.brokered.result.limitations

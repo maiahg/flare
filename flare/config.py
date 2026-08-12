@@ -145,6 +145,7 @@ class UnleashSettings(BaseModel):
 
 class ToolsSettings(BaseModel):
     provider: Literal["synthetic", "real"] = "synthetic"
+    default_service: str | None = None
     http_timeout_s: float = 5.0
     max_response_bytes: int = 2_000_000
     prometheus: PrometheusSettings = PrometheusSettings()
@@ -179,7 +180,7 @@ class RecoverySettings(BaseModel):
     window_minutes: int = 60
     recovered_ratio: float = 1.5
     degraded_ratio: float = 2.0
-    default_service: str = "checkout-api"
+    default_service: str | None = None
 
 
 class GovernorSettings(BaseModel):

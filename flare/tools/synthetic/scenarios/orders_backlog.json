@@ -1,5 +1,6 @@
 {
   "name": "orders_backlog",
+  "primary_service": "checkout-api",
   "incident_summary": "orders-worker queue backing up since 02:16 UTC; checkout order-success dropped from 99.3% to 71%. Two changes landed in the same two-minute window: deploy #7788 (redis-rb upgrade on orders-worker) and the async_order_confirmation flag ramp 0->100.",
   "_note": "Teaching scenario with TWO decoys. (1) A co-timed feature-flag ramp (async_order_confirmation, 02:15) that humans blame first, reinforced by a real past incident about that same flag. (2) A cosmetic web-storefront deploy (#7785, 01:50, CSS only) that landed before onset. The true cause is deploy #7788, which the redis-rb 5.0 upgrade shrank the connection pool 25->5: logs show 'pool exhausted / could not check out a connection', blame points at redis.rb line 8 in #7788, and payments-gateway is demonstrably healthy. A root cause that keys on 'a flag changed' or 'a deploy happened' rather than on what changed will name the wrong thing.",
   "metrics": {
@@ -17,6 +18,11 @@
       "p99_ms": { "01:56": 190, "01:58": 470, "02:02": 205, "02:16": 198, "02:28": 201, "02:36": 199 },
       "error_rate": { "01:56": 0.3, "01:58": 1.1, "02:02": 0.3, "02:16": 0.2, "02:28": 0.3, "02:36": 0.2 },
       "throughput_rps": { "01:56": 140, "01:58": 138, "02:02": 141, "02:16": 139, "02:28": 140, "02:36": 141 }
+    },
+    "web-storefront": {
+      "p99_ms": { "02:10": 88, "02:16": 90, "02:20": 87, "02:28": 89, "02:36": 88 },
+      "error_rate": { "02:10": 0.1, "02:16": 0.1, "02:20": 0.1, "02:28": 0.2, "02:36": 0.1 },
+      "throughput_rps": { "02:10": 410, "02:16": 408, "02:20": 412, "02:28": 409, "02:36": 411 }
     }
   },
   "logs": [
@@ -54,13 +60,90 @@
   "code": {
     "orders-worker": {
       "owners": ["@orders-team"],
-      "recent_pr": "https://github.com/acme/orders-worker/pull/933",
-      "blame": "config/initializers/redis.rb line 8: ConnectionPool.new(size: 25) changed to rely on redis-rb 5.0 default (size 5) in #7788 (@dev-omar). order_confirmation_worker.rb business logic unchanged."
+      "path": "config/initializers/redis.rb",
+      "commits": [
+        {
+          "id": "9f3a1c2",
+          "sha": "9f3a1c2b7d4e6f8a0b1c2d3e4f5a6b7c8d9e0f12",
+          "at": "2026-08-11T02:14:00Z",
+          "author": "@dev-omar",
+          "diff_summary": "upgrade redis-rb 4.8 -> 5.0; adopt new client defaults: ConnectionPool size 25 -> 5, checkout_timeout 1s; switch job serializer to Oj (:compat)",
+          "files": ["Gemfile.lock", "config/initializers/redis.rb", "app/workers/order_confirmation_worker.rb"],
+          "url": "https://github.com/acme/orders-worker/pull/933"
+        },
+        {
+          "id": "4c88ab0",
+          "sha": "4c88ab0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708",
+          "at": "2026-08-08T15:22:00Z",
+          "author": "@dev-omar",
+          "diff_summary": "OrderConfirmationWorker: raise retry attempts 3 -> 25 with exponential backoff",
+          "files": ["app/workers/order_confirmation_worker.rb"],
+          "url": "https://github.com/acme/orders-worker/pull/928"
+        },
+        {
+          "id": "1d0f5e9",
+          "sha": "1d0f5e9a2b3c4d5e6f708192a3b4c5d6e7f80912",
+          "at": "2026-08-01T09:03:00Z",
+          "author": "@orders-bot",
+          "diff_summary": "bump rubocop, widen CI ruby matrix to 3.3",
+          "files": [".rubocop.yml", ".github/workflows/ci.yml"],
+          "url": "https://github.com/acme/orders-worker/pull/921"
+        }
+      ]
+    },
+    "checkout-api": {
+      "owners": ["@checkout-team"],
+      "path": "app/controllers/orders_controller.rb",
+      "commits": [
+        {
+          "id": "7b2e4d1",
+          "sha": "7b2e4d1c8a9b0c1d2e3f405162738495a6b7c8d9",
+          "at": "2026-08-11T00:10:00Z",
+          "author": "@dev-rey",
+          "diff_summary": "hold checkout_express flag at 50% (config only; no runtime branch changed)",
+          "files": ["config/flags.yml"],
+          "url": "https://github.com/acme/checkout-api/pull/5140"
+        },
+        {
+          "id": "3a6c9f4",
+          "sha": "3a6c9f4d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f7",
+          "at": "2026-08-09T18:41:00Z",
+          "author": "@checkout-bot",
+          "diff_summary": "routine dependency bumps (no runtime change)",
+          "files": ["Gemfile.lock"],
+          "url": "https://github.com/acme/checkout-api/pull/5133"
+        }
+      ]
     },
     "payments-gateway": {
       "owners": ["@payments-team"],
-      "recent_pr": "https://github.com/acme/payments-gateway/pull/2201",
-      "blame": "no changes in 9 days; last deploy #7702 on 2026-08-03. The 01:58 p99 blip self-resolved by 02:02, before incident onset."
+      "path": "app/services/gateway.rb",
+      "commits": [
+        {
+          "id": "e50a7c2",
+          "sha": "e50a7c2f1b3d5e7092a4b6c8d0e2f4a6b8c0d2e4",
+          "at": "2026-08-03T11:30:00Z",
+          "author": "@payments-team",
+          "diff_summary": "deploy #7702: connection keep-alive tuning for upstream processor",
+          "files": ["config/initializers/gateway.rb"],
+          "url": "https://github.com/acme/payments-gateway/pull/2201"
+        }
+      ]
+    },
+    "web-storefront": {
+      "owners": ["@storefront-team"],
+      "path": "app/assets/stylesheets/orders.css",
+      "commits": [
+        {
+          "id": "c17d9b3",
+          "sha": "c17d9b3a5e7092b4d6f8091a3c5e7092b4d6f809",
+          "at": "2026-08-11T01:50:00Z",
+          "author": "@dev-tara",
+          "diff_summary": "restyle the order-status banner; CSS only, no runtime change (deploy #7785)",
+          "files": ["app/assets/stylesheets/orders.css"],
+          "url": "https://github.com/acme/web-storefront/pull/4402"
+        }
+      ]
     }
   },
   "flags": [

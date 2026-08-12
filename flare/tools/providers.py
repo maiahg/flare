@@ -14,6 +14,18 @@ from flare.tools.synthetic import DEFAULT_SCENARIO
 logger = logging.getLogger(__name__)
 
 
+def resolve_default_service(
+    scenario: str = DEFAULT_SCENARIO, *, provider: str | None = None
+) -> str | None:
+    settings = get_settings()
+    chosen = provider or settings.tools.provider
+    if chosen == "real":
+        return settings.tools.default_service
+    from flare.tools.synthetic.provider import load_scenario, scenario_primary_service
+
+    return scenario_primary_service(load_scenario(scenario))
+
+
 def build_broker(
     session: AsyncSession,
     *,

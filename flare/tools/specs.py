@@ -10,7 +10,7 @@ MetricAlias = Literal["p99_ms", "error_rate", "throughput_rps"]
 
 
 class MetricsArgs(ToolArgs):
-    service: str = "checkout-api"
+    service: str | None = None
     metric: MetricAlias = "p99_ms"
     window_minutes: int = Field(default=60, ge=1, le=1440)
 
@@ -33,7 +33,7 @@ class DeployArgs(ToolArgs):
 
 
 class CodeArgs(ToolArgs):
-    service: str = "payments-svc"
+    service: str | None = None
     path: str | None = None
 
 

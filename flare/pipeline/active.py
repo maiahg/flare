@@ -20,6 +20,7 @@ from flare.investigation.graph import InvestigationPoster
 from flare.models.core import ACTIVE_MODE, Incident
 from flare.redis import get_redis
 from flare.slack.posting import InvestigationSlackPoster, SlackPoster
+from flare.tools.providers import resolve_default_service
 from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.pipeline.active")
@@ -144,13 +145,17 @@ async def recovery_watch(ctx: dict, payload: dict[str, Any]) -> str:
         return "no_incident"
     mode, channel = state
 
+    scenario = str(payload.get("scenario", DEFAULT_SCENARIO))
     async with get_sessionmaker()() as session:
-        service = str(
-            payload.get("service")
-            or await infer_service(
-                session, incident_id, default=settings.recovery.default_service
-            )
+        service = payload.get("service") or await infer_service(
+            session,
+            incident_id,
+            default=settings.recovery.default_service
+            or resolve_default_service(scenario),
         )
+    if not service:
+        return "no_service"
+    service = str(service)
 
     watcher = RecoveryWatcher(
         incident_id,
@@ -158,7 +163,7 @@ async def recovery_watch(ctx: dict, payload: dict[str, Any]) -> str:
         redis=get_redis(),
         settings=settings.recovery,
         service=service,
-        scenario=str(payload.get("scenario", DEFAULT_SCENARIO)),
+        scenario=scenario,
     )
     assessment = await watcher.poll()
 

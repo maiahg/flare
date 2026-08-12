@@ -31,6 +31,13 @@ class PrometheusMetricsTool(BaseReadOnlyTool):
         self._overrides = overrides or {}
 
     async def fetch(self, args: MetricsArgs) -> ToolResult:
+        if args.service is None:
+            return self.degraded_result(
+                "no service specified for the metrics read",
+                service=None,
+                metric=args.metric,
+                series={},
+            )
         query = build_query(
             args.metric,
             service=args.service,

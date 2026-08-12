@@ -112,6 +112,14 @@ class GitHubCodeTool(BaseReadOnlyTool):
 
     async def fetch(self, args: CodeArgs) -> ToolResult:
         path = args.path or args.service
+        if path is None:
+            return self.degraded_result(
+                "no service or path specified for the code read",
+                service=None,
+                path=None,
+                owners=[],
+                commits=[],
+            )
         commits = await self._backend.get_json(
             f"/repos/{self._repo}/commits", params={"path": path, "per_page": 5}
         )

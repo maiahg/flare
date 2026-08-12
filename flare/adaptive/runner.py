@@ -33,6 +33,7 @@ from flare.investigation.state import RunState
 from flare.llm import get_llm_client
 from flare.models.claims import Hypothesis
 from flare.redis import get_redis
+from flare.tools.providers import resolve_default_service
 from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.adaptive")
@@ -136,8 +137,11 @@ async def start_adaptive_run(
             plan = await planner.run(verdicts=verdicts)
             step.output = {"agents": plan.agents, "focus": plan.focus}
             step.record_usage(planner.usage, fallback_model=settings.llm.models.planner)
-    plan.service = plan.service or trigger.get("service")
-    plan.suspect_service = plan.suspect_service or trigger.get("suspect_service")
+    default_service = resolve_default_service(scenario)
+    plan.service = plan.service or trigger.get("service") or default_service
+    plan.suspect_service = (
+        plan.suspect_service or trigger.get("suspect_service") or plan.service
+    )
     await recorder.save_plan(dict(plan.as_dict()))
 
     async def cancelled() -> bool:

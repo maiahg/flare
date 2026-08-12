@@ -19,6 +19,7 @@ from flare.investigation.recorder import BrokerFactory, RunRecorder
 from flare.investigation.resume import capture_interrupt
 from flare.investigation.state import RunState
 from flare.llm import get_llm_client
+from flare.tools.providers import resolve_default_service
 from flare.tools.synthetic import DEFAULT_SCENARIO
 
 _logger = logging.getLogger("flare.investigation")
@@ -79,6 +80,7 @@ async def start_initial_run(
         poster=poster,
         mitigation=settings.mitigation,
         approval_poster=approval_poster,
+        default_service=resolve_default_service(scenario),
     )
     graph = build_initial_graph(deps)
 

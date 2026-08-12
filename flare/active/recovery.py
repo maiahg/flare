@@ -264,8 +264,8 @@ def _announced_key(incident_id: uuid.UUID) -> str:
 
 
 async def infer_service(
-    session: AsyncSession, incident_id: uuid.UUID, *, default: str
-) -> str:
+    session: AsyncSession, incident_id: uuid.UUID, *, default: str | None = None
+) -> str | None:
     """Which service to watch: whatever the last run was actually looking at."""
     stored = await session.scalar(
         select(InvestigationRun.plan)

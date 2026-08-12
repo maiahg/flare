@@ -30,8 +30,6 @@ from flare.tools.specs import (
 
 _SCENARIO_DIR = Path(__file__).parent / "scenarios"
 
-#: The scenario fixture used when a trigger carries no explicit ``scenario``.
-#: Single source of truth — every default across the pipeline points here.
 DEFAULT_SCENARIO = "orders_backlog"
 
 
@@ -43,6 +41,14 @@ def load_scenario(name: str = DEFAULT_SCENARIO) -> dict[str, Any]:
         raise FileNotFoundError(f"no synthetic scenario {name!r} at {path}")
     data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     return data
+
+
+def scenario_primary_service(scenario: dict[str, Any]) -> str | None:
+    explicit = scenario.get("primary_service")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    metrics = scenario.get("metrics", {})
+    return next(iter(metrics), None)
 
 
 class _ScenarioTool(BaseReadOnlyTool):
@@ -126,13 +132,21 @@ class CodeTool(_ScenarioTool):
 
     async def fetch(self, args: CodeArgs) -> ToolResult:
         by_service = self._scenario.get("code", {})
-        if args.service not in by_service:
+        if args.service is None or args.service not in by_service:
             return self.degraded_result(
-                f"no code history recorded for {args.service}", commits=[]
+                f"no code history recorded for {args.service}",
+                service=args.service,
+                commits=[],
             )
+        entry = by_service[args.service]
         return ToolResult(
             system=self.system,
-            data={"service": args.service, **by_service[args.service]},
+            data={
+                "service": args.service,
+                "path": entry.get("path"),
+                "owners": entry.get("owners", []),
+                "commits": entry.get("commits", []),
+            },
         )
 
 

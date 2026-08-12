@@ -12,7 +12,7 @@ _TIME_WINDOW = re.compile(r"\b(\d{1,2}:\d{2}(?::\d{2})?)\b")
 
 #: `abc1234` … `abc1234def` — a git short sha. Bounded to avoid matching words.
 _COMMIT = re.compile(r"\b(?:commit|sha)[: ]+([0-9a-f]{7,40})\b", re.IGNORECASE)
-#: Service names as they appear in this stack: `checkout-api`, `payments-svc`.
+#: Service names as they appear in this stack
 _SERVICE = re.compile(r"\b([a-z][a-z0-9]*(?:-[a-z0-9]+)*-(?:api|svc|service|worker))\b")
 #: Latency/percentile/rate metrics.
 _METRIC = re.compile(
