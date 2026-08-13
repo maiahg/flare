@@ -86,10 +86,6 @@ class MitigationItem(BaseModel):
 class MitigationOutput(BaseModel):
     options: list[MitigationItem] = Field(default_factory=list)
 
-class CommsDraftOutput(BaseModel):
-    body: str = Field(description="the message text for this audience")
-
-
 class GroundedClaim(BaseModel):
     """A sentence plus the evidence indices that support it."""
 

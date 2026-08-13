@@ -13,9 +13,6 @@ from flare.api.v1.schemas import (
     ActionItemRead,
     ApprovalDecision,
     ApprovalRead,
-    CommsDraftPatch,
-    CommsDraftRead,
-    CommsGenerate,
     CorrectionCreate,
     CorrectionResult,
     EvidencePatch,
@@ -35,13 +32,11 @@ from flare.api.v1.schemas import (
     StatusUpdate,
 )
 from flare.approvals import decide_approval
-from flare.comms import CommsService
 from flare.config import get_settings
 from flare.llm import get_llm_client
 from flare.models.audit import Approval
 from flare.models.claims import (
     ActionItem,
-    CommsDraft,
     Evidence,
     Fact,
     Hypothesis,
@@ -67,19 +62,6 @@ async def _service(session: SessionDep, actor: ActorDep) -> SteeringService:
 
 
 ServiceDep = Annotated[SteeringService, Depends(_service)]
-
-
-async def _comms(session: SessionDep, actor: ActorDep) -> CommsService:
-    """The comms-draft writer for this request. It has no way to send anything."""
-    return CommsService(
-        session,
-        actor,
-        llm=get_llm_client(),
-        model=get_settings().llm.models.comms,
-    )
-
-
-CommsDep = Annotated[CommsService, Depends(_comms)]
 
 
 # ---- incidents -------------------------------------------------------------
@@ -271,48 +253,6 @@ async def patch_action_item(
     await service.commit(item)
     return item
 
-
-@router.post(
-    "/incidents/{incident_id}/comms/generate",
-    response_model=CommsDraftRead,
-    status_code=status.HTTP_201_CREATED,
-)
-async def generate_comms(
-    incident: IncidentDep, body: CommsGenerate, comms: CommsDep
-) -> CommsDraft:
-    """Write the next version of one audience's draft."""
-    result = await comms.generate(incident, audience=body.audience)
-    await comms.commit(result.draft)
-    return result.draft
-
-
-@router.patch(
-    "/incidents/{incident_id}/comms/{comms_id}", response_model=CommsDraftRead
-)
-async def edit_comms(
-    incident: IncidentDep,
-    comms_id: uuid.UUID,
-    body: CommsDraftPatch,
-    comms: CommsDep,
-) -> CommsDraft:
-    """Edit a draft — stored as a new version, so the old text stays readable."""
-    result = await comms.revise(incident, body=body.body, edited_from=comms_id)
-    await comms.commit(result.draft)
-    return result.draft
-
-
-@router.post(
-    "/incidents/{incident_id}/comms/{comms_id}/approve",
-    response_model=CommsDraftRead,
-)
-async def approve_comms(
-    incident: IncidentDep, comms_id: uuid.UUID, service: ServiceDep
-) -> CommsDraft:
-    """Approve a draft. Approval marks it approved; it never sends."""
-    draft = await service.approve_comms(incident, comms_id)
-    await service.commit(draft)
-    return draft
-    
 
 @router.post(
     "/incidents/{incident_id}/approvals/{approval_id}", response_model=ApprovalRead

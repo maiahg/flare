@@ -124,11 +124,6 @@ class MitigationOptionRead(ProvenanceEnvelope):
     expected_benefit: str | None = None
     approval_required: bool | None = None
 
-class CommsDraftRead(ProvenanceEnvelope):
-    audience: str | None = None
-    body: str | None = None
-    version: int | None = None
-
 class PostmortemDraftRead(ORMModel):
     id: uuid.UUID
     incident_id: uuid.UUID
@@ -283,12 +278,6 @@ class ActionItemCreate(WriteModel):
 class ActionItemPatch(WriteModel):
     status: str | None = None
     owner_user_id: uuid.UUID | None = None
-
-class CommsGenerate(WriteModel):
-    audience: str
-
-class CommsDraftPatch(WriteModel):
-    body: str
 
 class CorrectionCreate(WriteModel):
     correction_text: str

@@ -321,23 +321,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/incidents/{incident_id}/comms": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Comms */
-        get: operations["list_comms_api_v1_incidents__incident_id__comms_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/incidents/{incident_id}/postmortem": {
         parameters: {
             query?: never;
@@ -655,66 +638,6 @@ export interface paths {
         patch: operations["patch_action_item_api_v1_incidents__incident_id__action_items__action_item_id__patch"];
         trace?: never;
     };
-    "/api/v1/incidents/{incident_id}/comms/generate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Generate Comms
-         * @description Write the next version of one audience's draft.
-         */
-        post: operations["generate_comms_api_v1_incidents__incident_id__comms_generate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/incidents/{incident_id}/comms/{comms_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Edit Comms
-         * @description Edit a draft — stored as a new version, so the old text stays readable.
-         */
-        patch: operations["edit_comms_api_v1_incidents__incident_id__comms__comms_id__patch"];
-        trace?: never;
-    };
-    "/api/v1/incidents/{incident_id}/comms/{comms_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Approve Comms
-         * @description Approve a draft. Approval marks it approved; it never sends.
-         */
-        post: operations["approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/incidents/{incident_id}/approvals/{approval_id}": {
         parameters: {
             query?: never;
@@ -964,61 +887,6 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
-        };
-        /** CommsDraftPatch */
-        CommsDraftPatch: {
-            /** Body */
-            body: string;
-        };
-        /** CommsDraftRead */
-        CommsDraftRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Incident Id
-             * Format: uuid
-             */
-            incident_id: string;
-            /** Kind */
-            kind?: string | null;
-            /** Confidence */
-            confidence?: number | null;
-            /** Source */
-            source?: {
-                [key: string]: unknown;
-            } | null;
-            /** Created By */
-            created_by?: string | null;
-            /** Status */
-            status?: string | null;
-            /** Last Verified At */
-            last_verified_at?: string | null;
-            /** Superseded By */
-            superseded_by?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-            /** Audience */
-            audience?: string | null;
-            /** Body */
-            body?: string | null;
-            /** Version */
-            version?: number | null;
-        };
-        /** CommsGenerate */
-        CommsGenerate: {
-            /** Audience */
-            audience: string;
         };
         /** CorrectionCreate */
         CorrectionCreate: {
@@ -2613,39 +2481,6 @@ export interface operations {
             };
         };
     };
-    list_comms_api_v1_incidents__incident_id__comms_get: {
-        parameters: {
-            query?: {
-                audience?: string | null;
-            };
-            header?: never;
-            path: {
-                incident_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommsDraftRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_postmortem_api_v1_incidents__incident_id__postmortem_get: {
         parameters: {
             query?: never;
@@ -3193,115 +3028,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionItemRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    generate_comms_api_v1_incidents__incident_id__comms_generate_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Flare-Actor"?: string | null;
-            };
-            path: {
-                incident_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CommsGenerate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommsDraftRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    edit_comms_api_v1_incidents__incident_id__comms__comms_id__patch: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Flare-Actor"?: string | null;
-            };
-            path: {
-                comms_id: string;
-                incident_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CommsDraftPatch"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommsDraftRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Flare-Actor"?: string | null;
-            };
-            path: {
-                comms_id: string;
-                incident_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommsDraftRead"];
                 };
             };
             /** @description Validation Error */

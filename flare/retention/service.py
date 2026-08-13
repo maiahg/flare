@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from flare.models.audit import Approval, DataErasure, MemoryRevision
 from flare.models.claims import (
     ActionItem,
-    CommsDraft,
     Decision,
     Evidence,
     EvidenceLink,
@@ -41,7 +40,6 @@ _INCIDENT_TABLES: tuple[tuple[str, Any], ...] = (
     ("action_items", ActionItem),
     ("timeline_entries", TimelineEntry),
     ("mitigation_options", MitigationOption),
-    ("comms_drafts", CommsDraft),
     ("evidence_links", EvidenceLink),
     ("summaries", Summary),
     ("postmortem_drafts", PostmortemDraft),

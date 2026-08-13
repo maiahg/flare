@@ -13,7 +13,6 @@ from flare.api.v1.schemas import (
     ActionItemRead,
     AgentTraceRead,
     ApprovalRead,
-    CommsDraftRead,
     DecisionRead,
     EvidenceRead,
     FactRead,
@@ -37,7 +36,6 @@ from flare.db.session import get_session
 from flare.models.audit import Approval, MemoryRevision
 from flare.models.claims import (
     ActionItem,
-    CommsDraft,
     Decision,
     Evidence,
     EvidenceLink,
@@ -296,15 +294,6 @@ async def list_mitigations(
     incident: IncidentDep, session: SessionDep
 ) -> Sequence[MitigationOption]:
     return await _claims(session, MitigationOption, incident.id)
-
-
-@router.get("/incidents/{incident_id}/comms", response_model=list[CommsDraftRead])
-async def list_comms(
-    incident: IncidentDep,
-    session: SessionDep,
-    audience: Annotated[str | None, Query()] = None,
-) -> Sequence[CommsDraft]:
-    return await _claims(session, CommsDraft, incident.id, audience=audience)
 
 
 @router.get("/incidents/{incident_id}/postmortem", response_model=PostmortemDraftRead)

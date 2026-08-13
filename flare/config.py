@@ -34,7 +34,6 @@ ROLE_TIERS: Mapping[str, str] = {
     "summarizer": "reasoning",
     "mitigation": "reasoning",
     "verifier": "reasoning",
-    "comms": "reasoning",
     "postmortem": "reasoning",
 }
 
@@ -68,7 +67,6 @@ class LLMModelSettings(BaseModel):
     summarizer: str = INHERIT_TIER
     mitigation: str = INHERIT_TIER
     verifier: str = INHERIT_TIER
-    comms: str = INHERIT_TIER
     postmortem: str = INHERIT_TIER
 
     def resolved(self) -> LLMModelSettings:

@@ -1,7 +1,6 @@
 from flare.models.audit import Approval, MemoryRevision
 from flare.models.claims import (
     ActionItem,
-    CommsDraft,
     Decision,
     Evidence,
     EvidenceLink,
@@ -30,7 +29,6 @@ __all__ = [
     "Workspace",
     # claims + narrative + links
     "ActionItem",
-    "CommsDraft",
     "Decision",
     "Evidence",
     "EvidenceLink",

@@ -47,7 +47,6 @@ TIMELINE_ENTRY_TYPES = (
     "deploy",
     "mitigation",
     "observation",
-    "comms",
     "decision",
 )
 MITIGATION_RISKS = ("low", "medium", "high")
@@ -59,8 +58,6 @@ MITIGATION_STATUSES = (
     "applied",
     "rolled_back",
 )
-COMMS_AUDIENCES = ("internal", "support", "status", "exec")
-COMMS_STATUSES = ("draft", "approved", "sent")
 SUMMARY_SCOPES = ("current", "internal", "support", "status", "exec")
 EVIDENCE_LINK_SUBJECT_TYPES = (
     "hypothesis",
@@ -222,19 +219,6 @@ class MitigationOption(UUIDAuditMixin, ProvenanceMixin, Base):
     )
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, server_default="proposed"
-    )
-
-
-class CommsDraft(UUIDAuditMixin, ProvenanceMixin, Base):
-    """A drafted communication for a given audience."""
-
-    __tablename__ = "comms_drafts"
-
-    audience: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    body: Mapped[str | None] = mapped_column(Text, nullable=True)
-    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
-    status: Mapped[str] = mapped_column(
-        String(32), nullable=False, server_default="draft"
     )
 
 

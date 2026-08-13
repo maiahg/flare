@@ -4,12 +4,10 @@ from typing import Any
 
 from flare.models.claims import (
     ACTION_ITEM_STATUSES,
-    COMMS_STATUSES,
     HYPOTHESIS_STATUSES,
     MITIGATION_STATUSES,
     OPEN_QUESTION_STATUSES,
     ActionItem,
-    CommsDraft,
     Decision,
     Evidence,
     Fact,
@@ -29,7 +27,6 @@ CLAIM_MODELS: tuple[type[Any], ...] = (
     ActionItem,
     TimelineEntry,
     MitigationOption,
-    CommsDraft,
 )
 
 OP_CREATE = "create"
@@ -51,7 +48,6 @@ _SPECIALIZED_STATUSES: dict[type[Any], tuple[str, ...]] = {
     OpenQuestion: OPEN_QUESTION_STATUSES,
     ActionItem: ACTION_ITEM_STATUSES,
     MitigationOption: MITIGATION_STATUSES,
-    CommsDraft: COMMS_STATUSES,
 }
 
 GLOBAL_IMMUTABLE_FIELDS = frozenset(

@@ -20,7 +20,6 @@ from flare.models.claims import (
     ACTION_ITEM_STATUSES,
     OPEN_QUESTION_STATUSES,
     ActionItem,
-    CommsDraft,
     Decision,
     Evidence,
     Fact,
@@ -410,19 +409,6 @@ class SteeringService:
             changes,
             status,
             action="updated action item",
-        )
-
-    async def approve_comms(
-        self, incident: Incident, comms_id: uuid.UUID
-    ) -> CommsDraft:
-        """Mark a comms draft approved"""
-        return await self._apply(
-            CommsDraft,
-            incident,
-            comms_id,
-            {},
-            "approved",
-            action="approved comms draft",
         )
 
     # ---- corrections ------------------------------------------------------

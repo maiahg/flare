@@ -115,46 +115,6 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
-        "comms_drafts",
-        sa.Column("audience", sa.String(length=32), nullable=True),
-        sa.Column("body", sa.Text(), nullable=True),
-        sa.Column("version", sa.Integer(), server_default="1", nullable=False),
-        sa.Column(
-            "status", sa.String(length=32), server_default="draft", nullable=False
-        ),
-        sa.Column(
-            "id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False
-        ),
-        sa.Column(
-            "created_at",
-            sa.TIMESTAMP(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.TIMESTAMP(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column("kind", sa.String(length=32), nullable=True),
-        sa.Column("confidence", sa.Numeric(precision=3, scale=2), nullable=True),
-        sa.Column("source", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("created_by", sa.String(length=255), nullable=True),
-        sa.Column("last_verified_at", sa.TIMESTAMP(timezone=True), nullable=True),
-        sa.Column("superseded_by", sa.UUID(), nullable=True),
-        sa.Column("embedding", pgvector.sqlalchemy.Vector(1536), nullable=True),
-        sa.Column("incident_id", sa.UUID(), nullable=False),
-        sa.ForeignKeyConstraint(["incident_id"], ["incidents.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index(
-        op.f("ix_comms_drafts_incident_id"),
-        "comms_drafts",
-        ["incident_id"],
-        unique=False,
-    )
-    op.create_table(
         "decisions",
         sa.Column("statement", sa.Text(), nullable=False),
         sa.Column("decided_by", sa.String(length=255), nullable=True),
@@ -945,8 +905,6 @@ def downgrade() -> None:
     op.drop_table("facts")
     op.drop_index(op.f("ix_decisions_incident_id"), table_name="decisions")
     op.drop_table("decisions")
-    op.drop_index(op.f("ix_comms_drafts_incident_id"), table_name="comms_drafts")
-    op.drop_table("comms_drafts")
     op.drop_index("ix_approvals_subject", table_name="approvals")
     op.drop_index(op.f("ix_approvals_status"), table_name="approvals")
     op.drop_index(op.f("ix_approvals_incident_id"), table_name="approvals")
