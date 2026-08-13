@@ -6,7 +6,7 @@ features:
     always_online: true
 oauth_config:
   redirect_urls:
-    - https://holder-bits-usc-dui.trycloudflare.com/slack/oauth/callback
+    - https://TUNNEL_URL/slack/oauth/callback
   scopes:
     bot:
       - chat:write
@@ -15,12 +15,12 @@ oauth_config:
       - app_mentions:read
 settings:
   event_subscriptions:
-    request_url: https://holder-bits-usc-dui.trycloudflare.com/slack/events
+    request_url: https://TUNNEL_URL/slack/events
     bot_events:
       - message.channels
       - member_joined_channel
       - app_mention
   interactivity:
     is_enabled: true
-    request_url: https://holder-bits-usc-dui.trycloudflare.com/slack/interactions
+    request_url: https://TUNNEL_URL/slack/interactions
 
