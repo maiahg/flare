@@ -79,36 +79,13 @@
         }
       }
     },
-    "/slack/commands": {
-      "post": {
-        "tags": [
-          "slack"
-        ],
-        "summary": "Slack Commands Route",
-        "operationId": "slack_commands_route_slack_commands_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Slack Commands Route Slack Commands Post"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/slack/interactions": {
       "post": {
         "tags": [
           "slack"
         ],
         "summary": "Slack Interactions",
-        "description": "Interactivity endpoint: buttons, menus and modals steer the incident (\u00a75).\n\nThe work happens inline \u2014 these are single-row steering writes, well inside\nSlack's 3s budget \u2014 and the confirmation goes back through ``response_url``.\nA ``view_submission`` is answered with Slack's own ACK shape instead.",
+        "description": "Interactivity endpoint: buttons and menus steer the incident",
         "operationId": "slack_interactions_slack_interactions_post",
         "responses": {
           "200": {
@@ -269,7 +246,7 @@
           "steering"
         ],
         "summary": "Create Incident",
-        "description": "Open an incident (\u00a74.2).",
+        "description": "Open an incident.",
         "operationId": "create_incident_api_v1_incidents_post",
         "parameters": [
           {
@@ -371,7 +348,7 @@
           "ops"
         ],
         "summary": "Erase",
-        "description": "Delete an incident and everything cascading from it (\u00a711.11).\n\nRequires the actor header like every other write, plus a reason in the\nbody. The response is the receipt \u2014 row counts by table \u2014 and a\n``data_erasures`` tombstone outlives the data as the only remaining proof.\n\nReturns 200 with the receipt rather than 204: a deletion the caller cannot\naudit is a deletion they have to take on faith.",
+        "description": "Delete an incident and everything cascading from it.",
         "operationId": "erase_api_v1_incidents__incident_id__delete",
         "parameters": [
           {
@@ -1192,7 +1169,7 @@
           "incidents"
         ],
         "summary": "Get Run Detail",
-        "description": "A run with its agent traces and each trace's tool calls.\n\nThe run is matched on ``incident_id`` too, so a run id from another\nincident 404s rather than leaking across incidents.",
+        "description": "A run with its agent traces and each trace's tool calls.",
         "operationId": "get_run_detail_api_v1_incidents__incident_id__runs__run_id__get",
         "parameters": [
           {
@@ -1246,7 +1223,7 @@
           "incidents"
         ],
         "summary": "List Triggers",
-        "description": "Trigger decisions for an incident, newest first (\u00a77.4).\n\nIncludes ``skip`` decisions on purpose: the suppressed ones are exactly\nwhat you want to audit when the bot felt too quiet or too noisy.",
+        "description": "Trigger decisions for an incident, newest first",
         "operationId": "list_triggers_api_v1_incidents__incident_id__triggers_get",
         "parameters": [
           {
@@ -1322,7 +1299,7 @@
           "incidents"
         ],
         "summary": "List Incident Approvals",
-        "description": "Approval requests, newest first.\n\nPending ones are the actionable list: each represents a branch of an\ninvestigation waiting on a human (\u00a77.6).",
+        "description": "Approval requests, newest first.",
         "operationId": "list_incident_approvals_api_v1_incidents__incident_id__approvals_get",
         "parameters": [
           {
@@ -1467,7 +1444,7 @@
           "ops"
         ],
         "summary": "Get Incident Usage",
-        "description": "Token spend for an incident, per run and per agent, against its budget.\n\nNo USD anywhere: the provider reports token usage only (\u00a73.2), and inventing\na price from a public rate card would be a number people plan with and we\ncannot stand behind.",
+        "description": "Token spend for an incident, per run and per agent, against its budget.",
         "operationId": "get_incident_usage_api_v1_incidents__incident_id__usage_get",
         "parameters": [
           {
@@ -1511,7 +1488,7 @@
           "ops"
         ],
         "summary": "Export",
-        "description": "Everything the product holds about this incident, as one JSON document.\n\nServes both the postmortem-record use and the \"show me my data\" use on\npurpose: an export that shows less than the dashboard would be a lie by\nomission, and maintaining two extractors guarantees they diverge.",
+        "description": "Everything the product holds about this incident, as one JSON document.",
         "operationId": "export_api_v1_incidents__incident_id__export_get",
         "parameters": [
           {
@@ -1557,7 +1534,7 @@
           "steering"
         ],
         "summary": "Set Mode",
-        "description": "Set the behavior mode: quiet | scribe | assist | active (\u00a79.5).",
+        "description": "Set the behavior mode: quiet | scribe | assist | active.",
         "operationId": "set_mode_api_v1_incidents__incident_id__mode_post",
         "parameters": [
           {
@@ -1697,7 +1674,7 @@
           "steering"
         ],
         "summary": "Investigate",
-        "description": "Queue a manual, targeted, read-only run (\u00a74.3).\n\n202, not 200: the run executes on the worker. Returning only once it\nfinished would hold the request open for the whole investigation budget.",
+        "description": "Queue a manual, targeted, read-only run.",
         "operationId": "investigate_api_v1_incidents__incident_id__investigate_post",
         "parameters": [
           {
@@ -1847,7 +1824,7 @@
           "steering"
         ],
         "summary": "Patch Hypothesis",
-        "description": "Confirm or reject a hypothesis (\u00a711.9: a rejection is permanent).",
+        "description": "Confirm or reject a hypothesis.",
         "operationId": "patch_hypothesis_api_v1_incidents__incident_id__hypotheses__hypothesis_id__patch",
         "parameters": [
           {
@@ -1927,7 +1904,7 @@
           "steering"
         ],
         "summary": "Patch Evidence",
-        "description": "Mark evidence stale \u2014 the only mutation an observation allows (\u00a73.3).",
+        "description": "Mark evidence stale \u2014 the only mutation an observation allows.",
         "operationId": "patch_evidence_api_v1_incidents__incident_id__evidence__evidence_id__patch",
         "parameters": [
           {
@@ -2166,7 +2143,7 @@
           "steering"
         ],
         "summary": "Generate Comms",
-        "description": "Write the next version of one audience's draft (\u00a75).\n\nDrafting is not sending, and this endpoint is not a send button: it appends\na ``comms_drafts`` row. Nothing in the comms package can reach Slack, email\nor a status page (\u00a711.2).",
+        "description": "Write the next version of one audience's draft.",
         "operationId": "generate_comms_api_v1_incidents__incident_id__comms_generate_post",
         "parameters": [
           {
@@ -2316,7 +2293,7 @@
           "steering"
         ],
         "summary": "Approve Comms",
-        "description": "Approve a draft. Approval marks it approved; it never sends (\u00a711.2).",
+        "description": "Approve a draft. Approval marks it approved; it never sends.",
         "operationId": "approve_comms_api_v1_incidents__incident_id__comms__comms_id__approve_post",
         "parameters": [
           {
@@ -2386,7 +2363,7 @@
           "steering"
         ],
         "summary": "Decide",
-        "description": "Approve or reject a gated recommendation (\u00a74.3 / \u00a77.6).\n\nApproval **records intent only**. It flips the approval row and the\nmitigation's status and releases the paused branch so it can finish\nrecording the outcome \u2014 it never applies the mitigation, and there is no\nadapter it could apply one with (\u00a711.1).",
+        "description": "Approve or reject a gated recommendation",
         "operationId": "decide_api_v1_incidents__incident_id__approvals__approval_id__post",
         "parameters": [
           {
@@ -2466,7 +2443,7 @@
           "steering"
         ],
         "summary": "Submit Correction",
-        "description": "Record a human correction; Scribe reconciles what it invalidates (\u00a74.3).",
+        "description": "Record a human correction; Scribe reconciles what it invalidates.",
         "operationId": "submit_correction_api_v1_incidents__incident_id__corrections_post",
         "parameters": [
           {
@@ -2612,7 +2589,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Live incident events (\u00a74.4).",
+            "description": "Live incident events.",
             "content": {
               "text/event-stream": {}
             }
@@ -3064,8 +3041,7 @@
         "required": [
           "decision"
         ],
-        "title": "ApprovalDecision",
-        "description": "``{decision: approved|rejected, note?}`` \u2014 \u00a74.3 ``POST /approvals/{id}``."
+        "title": "ApprovalDecision"
       },
       "ApprovalRead": {
         "properties": {
@@ -3176,8 +3152,7 @@
           "status",
           "created_at"
         ],
-        "title": "ApprovalRead",
-        "description": "An approval request. ``status`` is the whole point: pending blocks a\nbranch, and a decision records human intent \u2014 never an execution."
+        "title": "ApprovalRead"
       },
       "CommsDraftPatch": {
         "properties": {
@@ -3191,8 +3166,7 @@
         "required": [
           "body"
         ],
-        "title": "CommsDraftPatch",
-        "description": "A human's edit. Saved as a new version, never over the old text."
+        "title": "CommsDraftPatch"
       },
       "CommsDraftRead": {
         "properties": {
@@ -3351,8 +3325,7 @@
         "required": [
           "audience"
         ],
-        "title": "CommsGenerate",
-        "description": "``{audience}`` \u2014 write the next version of one audience's draft."
+        "title": "CommsGenerate"
       },
       "CorrectionCreate": {
         "properties": {
@@ -3633,7 +3606,7 @@
           "detail"
         ],
         "title": "ErasureRequest",
-        "description": "``DELETE /incidents/{id}`` body \u2014 deletion needs a stated reason.\n\nA free-text reason is not bureaucracy: this is the only endpoint in the\nproduct that destroys memory, and the tombstone it writes is the only\nrecord that will remain."
+        "description": "``DELETE /incidents/{id}`` body \u2014 deletion needs a stated reason."
       },
       "EvidencePatch": {
         "properties": {
@@ -3648,7 +3621,7 @@
           "status"
         ],
         "title": "EvidencePatch",
-        "description": "Evidence accepts exactly one edit: marking it stale (\u00a73.3)."
+        "description": "Evidence accepts exactly one edit: marking it stale."
       },
       "EvidenceRead": {
         "properties": {
@@ -4454,7 +4427,7 @@
           "counts"
         ],
         "title": "IncidentDetail",
-        "description": "Overview payload: the incident, its current summary, and counts (\u00a74.2)."
+        "description": "Overview payload: the incident, its current summary, and counts."
       },
       "IncidentRead": {
         "properties": {
@@ -4744,7 +4717,7 @@
           "exhausted"
         ],
         "title": "IncidentUsage",
-        "description": "Token spend for an incident against its budget (no USD \u2014 see \u00a73.2).\n\n``near_cap`` mirrors what the provider reports for the account-wide budget,\nso the dashboard can render an approaching per-incident ceiling and an\napproaching provider ceiling the same way."
+        "description": "Token spend for an incident against its budget"
       },
       "InvestigateRequest": {
         "properties": {
@@ -5554,7 +5527,7 @@
           "created_at"
         ],
         "title": "RunDetail",
-        "description": "A run plus its agent traces and the tool calls beneath them (\u00a74.2)."
+        "description": "A run plus its agent traces and the tool calls beneath them."
       },
       "RunRead": {
         "properties": {
@@ -5760,7 +5733,7 @@
           "tokens_out"
         ],
         "title": "RunTokenUsage",
-        "description": "Per-run usage \u2014 the row the \u00a76.4 run detail shows."
+        "description": "Per-run usage \u2014 the row the run detail shows."
       },
       "StatusUpdate": {
         "properties": {
@@ -6248,7 +6221,7 @@
           "created_at"
         ],
         "title": "TriggerRead",
-        "description": "One trigger decision, with the reasons that produced it.\n\nExposed because \"why did/didn't the bot investigate that message?\" has to\nbe answerable without reading logs \u2014 the reasons list carries both the\nnovelty verdicts and any classifier commentary."
+        "description": "One trigger decision, with the reasons that produced it."
       },
       "ValidationError": {
         "properties": {

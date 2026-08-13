@@ -5,13 +5,13 @@ from arq.connections import RedisSettings
 from flare.config import get_settings
 from flare.pipeline.active import active_refresh, recovery_watch
 from flare.pipeline.adaptive import run_adaptive_investigation
-from flare.pipeline.comms import generate_comms_draft
 from flare.pipeline.correction import reconcile_correction
 from flare.pipeline.investigation import run_initial_investigation
 from flare.pipeline.mention import handle_mention_job
 from flare.pipeline.messages import process_message
 from flare.pipeline.postmortem import generate_postmortem_draft
 from flare.pipeline.verification import run_claim_verification
+
 
 def _redis_settings() -> RedisSettings:
     return RedisSettings.from_dsn(str(get_settings().redis_url))
@@ -31,7 +31,6 @@ class WorkerSettings:
         process_message,
         run_initial_investigation,
         run_adaptive_investigation,
-        generate_comms_draft,
         generate_postmortem_draft,
         reconcile_correction,
         run_claim_verification,

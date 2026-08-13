@@ -18,7 +18,7 @@ DEFAULT_LLM_TIMEOUT_SECONDS = 45
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_REQUEST_ID_HEADER = "X-Request-Id"
 
-DEFAULT_FAST_MODEL = "openai/gpt-oss-20b:free"
+DEFAULT_FAST_MODEL = "openai/gpt-oss-120b"
 DEFAULT_REASONING_MODEL = "openai/gpt-5.6-luna"
 
 

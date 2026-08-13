@@ -9,6 +9,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from flare.approvals import decide_approval
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
 from flare.llm import get_llm_client
@@ -24,20 +25,9 @@ from flare.slack.blocks import (
     ACTION_QUESTION_ANSWERED,
     ACTION_QUESTION_ASSIGN,
 )
-from flare.approvals import decide_approval
-from flare.comms import CommsService
 from flare.slack.incident_ops import incident_for_channel, resolve_user
-from flare.slack.modals import (
-    ACTION_COMMS_AUDIENCE,
-    BLOCK_COMMS_BODY,
-    CALLBACK_COMMS_DRAFT,
-    SlackModals,
-    loading_view,
-    parse_metadata,
-    submitted_body,
-)
 from flare.steering import Actor, SteeringError, SteeringService, slack_actor
-from flare.worker.enqueue import enqueue_adaptive_run, enqueue_comms_draft
+from flare.worker.enqueue import enqueue_adaptive_run
 
 _logger = logging.getLogger("flare.slack.interactions")
 
@@ -63,15 +53,8 @@ async def handle_interaction(
     payload: dict[str, Any], *, responder: Responder | None = None
 ) -> dict[str, Any]:
     """Dispatch one Slack interaction. Returns the ACK body (for tests + logs)."""
-    if payload.get("type") == "view_submission":
-        return await handle_view_submission(payload)
-    if payload.get("type") == "view_closed":
-        return {"ok": True, "status": "closed"}
     if payload.get("type") != "block_actions":
         return {"ok": True, "status": "ignored"}
-
-    if payload.get("view"):
-        return await _handle_view_action(payload)
 
     actions = payload.get("actions") or []
     if not actions:
@@ -104,7 +87,7 @@ async def handle_interaction(
             await session.rollback()
             await _reply(send, response_url, f":warning: {exc}")
             return {"ok": True, "status": "rejected", "text": str(exc)}
-        except Exception as exc:  # noqa: BLE001 - surface, don't 500 at Slack
+        except Exception as exc:
             await session.rollback()
             _logger.exception("interaction %s failed", action_id)
             await _reply(send, response_url, f":warning: {exc}")
@@ -244,88 +227,6 @@ def _entity_from_block(
     return uuid.UUID(raw)
 
 
-async def _handle_view_action(payload: dict[str, Any]) -> dict[str, Any]:
-    """Switching the audience selector refills the modal for that audience."""
-    actions = payload.get("actions") or []
-    action = actions[0] if actions else {}
-    if str(action.get("action_id", "")) != ACTION_COMMS_AUDIENCE:
-        return {"ok": True, "status": "ignored"}
-
-    view = payload.get("view") or {}
-    metadata = parse_metadata(view.get("private_metadata"))
-    incident_id = metadata.get("incident_id")
-    audience = str((action.get("selected_option") or {}).get("value") or "")
-    if not incident_id or not audience:
-        return {"ok": True, "status": "ignored"}
-
-    view_id = str(view.get("id") or "")
-    if view_id:
-        try:
-            await SlackModals().update(
-                view_id=view_id,
-                view=loading_view(
-                    incident_id=uuid.UUID(incident_id), audience=audience
-                ),
-            )
-        except Exception: 
-            _logger.warning("failed to show the loading view", exc_info=True)
-    await enqueue_comms_draft(
-        {
-            "incident_id": incident_id,
-            "audience": audience,
-            "view_id": view_id or None,
-            "user_id": str((payload.get("user") or {}).get("id", "")),
-        }
-    )
-    return {"ok": True, "status": "drafting", "audience": audience}
-
-
-async def handle_view_submission(payload: dict[str, Any]) -> dict[str, Any]:
-    """Save any edit as a new version, then approve it. """
-    view = payload.get("view") or {}
-    if str(view.get("callback_id", "")) != CALLBACK_COMMS_DRAFT:
-        return {}
-
-    metadata = parse_metadata(view.get("private_metadata"))
-    incident_id = metadata.get("incident_id")
-    draft_id = metadata.get("draft_id")
-    if not incident_id or not draft_id:
-        return _view_error("This draft is still being written — try again.")
-
-    actor = slack_actor(
-        str((payload.get("user") or {}).get("id", "")),
-        (payload.get("user") or {}).get("name"),
-    )
-    body = submitted_body(view)
-
-    async with get_sessionmaker()() as session:
-        incident = await session.get(Incident, uuid.UUID(incident_id))
-        if incident is None:
-            return _view_error("That incident no longer exists.")
-        comms = CommsService(session, actor)
-        try:
-            revision = await comms.revise(
-                incident, body=body, edited_from=uuid.UUID(draft_id)
-            )
-            steering = SteeringService(session, actor)
-            await steering.approve_comms(incident, revision.draft.id)
-            await comms.commit()
-        except SteeringError as exc:
-            await session.rollback()
-            return _view_error(str(exc))
-        except Exception as exc:  # noqa: BLE001 - show it in the modal, don't 500
-            await session.rollback()
-            _logger.exception("comms approval failed")
-            return _view_error(str(exc))
-
-    return {"response_action": "clear"}
-
-
-def _view_error(message: str) -> dict[str, Any]:
-    """Slack's inline-error shape, attached to the body input."""
-    return {"response_action": "errors", "errors": {BLOCK_COMMS_BODY: message}}
-
-
 async def _evidence_summary(
     session: AsyncSession, incident: Incident, hypothesis_id: uuid.UUID
 ) -> str:
@@ -356,5 +257,4 @@ __all__ = [
     "Responder",
     "dashboard_url",
     "handle_interaction",
-    "handle_view_submission",
 ]

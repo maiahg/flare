@@ -150,7 +150,7 @@ async def slack_events(request: Request) -> dict[str, Any]:
 
 @router.post("/interactions")
 async def slack_interactions(request: Request) -> dict[str, Any]:
-    """Interactivity endpoint: buttons, menus and modals steer the incident"""
+    """Interactivity endpoint: buttons and menus steer the incident"""
     body = await _verified_body(request)
     form = parse_qs(body)
     raw_payload = form.get("payload", ["{}"])[0]
@@ -162,10 +162,7 @@ async def slack_interactions(request: Request) -> dict[str, Any]:
         "slack interaction received",
         extra={"interaction_type": interaction.get("type")},
     )
-    result = await handle_interaction(interaction)
-    if interaction.get("type") == "view_submission":
-        return {k: v for k, v in result.items() if k in ("response_action", "errors")}
-    return result
+    return await handle_interaction(interaction)
 
 
 @router.get("/oauth/callback")

@@ -52,10 +52,17 @@ class SlackPoster:
 
 
 async def post_incident_card(
-    poster: SlackPoster, *, channel: str, title: str, severity: str
+    poster: SlackPoster,
+    *,
+    channel: str,
+    title: str,
+    severity: str,
+    dashboard_url: str | None = None,
 ) -> str | None:
     """Post the pinned incident card + 'investigating…'. Returns its ts."""
     text = f":rotating_light: *{title}* ({severity})\nFlare is investigating…"
+    if dashboard_url:
+        text += f"\n<{dashboard_url}|Open dashboard →>"
     result = await poster.post_message(channel, text)
     return result.get("ts")
 

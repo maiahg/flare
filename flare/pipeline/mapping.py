@@ -49,8 +49,9 @@ def plan_claims(text: str, signals: list[ExtractedSignal]) -> ClaimPlan:
             if body:
                 timeline.append({"entry_type": "deploy", "description": body})
         elif s.signal_type == "mitigation":
-            timeline.append({"entry_type": "mitigation", "description": body or text})
-            decisions.append({"statement": _statement(s, text)})
+            statement = _statement(s, text)
+            timeline.append({"entry_type": "mitigation", "description": statement})
+            decisions.append({"statement": statement})
         elif s.signal_type in {"symptom", "metric", "error"} and s.confidence >= 0.7:
             statement = _statement(s, text)
             if statement:
@@ -64,7 +65,7 @@ def plan_claims(text: str, signals: list[ExtractedSignal]) -> ClaimPlan:
             action_items.append({"description": _statement(s, text)})
 
     return ClaimPlan(
-        timeline,
+        _dedupe(timeline, "description"),
         _dedupe(facts, "statement"),
         questions,
         _dedupe(decisions, "statement"),

@@ -85,7 +85,7 @@ export function Sidebar() {
           <SparkIcon className="h-3.5 w-3.5" />
         </span>
         <span className="text-[0.72rem] font-semibold tracking-[0.12em] text-[var(--sidebar-fg)]">
-          FLARE · COPILOT
+          FLARE
         </span>
       </div>
 

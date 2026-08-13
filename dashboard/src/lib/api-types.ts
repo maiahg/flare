@@ -64,23 +64,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/slack/commands": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Slack Commands Route */
-        post: operations["slack_commands_route_slack_commands_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/slack/interactions": {
         parameters: {
             query?: never;
@@ -92,11 +75,7 @@ export interface paths {
         put?: never;
         /**
          * Slack Interactions
-         * @description Interactivity endpoint: buttons, menus and modals steer the incident.
-         *
-         *     The work happens inline — these are single-row steering writes, well inside
-         *     Slack's 3s budget — and the confirmation goes back through ``response_url``.
-         *     A ``view_submission`` is answered with Slack's own ACK shape instead.
+         * @description Interactivity endpoint: buttons and menus steer the incident
          */
         post: operations["slack_interactions_slack_interactions_post"];
         delete?: never;
@@ -166,13 +145,6 @@ export interface paths {
         /**
          * Erase
          * @description Delete an incident and everything cascading from it.
-         *
-         *     Requires the actor header like every other write, plus a reason in the
-         *     body. The response is the receipt — row counts by table — and a
-         *     ``data_erasures`` tombstone outlives the data as the only remaining proof.
-         *
-         *     Returns 200 with the receipt rather than 204: a deletion the caller cannot
-         *     audit is a deletion they have to take on faith.
          */
         delete: operations["erase_api_v1_incidents__incident_id__delete"];
         options?: never;
@@ -416,9 +388,6 @@ export interface paths {
         /**
          * Get Run Detail
          * @description A run with its agent traces and each trace's tool calls.
-         *
-         *     The run is matched on ``incident_id`` too, so a run id from another
-         *     incident 404s rather than leaking across incidents.
          */
         get: operations["get_run_detail_api_v1_incidents__incident_id__runs__run_id__get"];
         put?: never;
@@ -438,10 +407,7 @@ export interface paths {
         };
         /**
          * List Triggers
-         * @description Trigger decisions for an incident, newest first.
-         *
-         *     Includes ``skip`` decisions on purpose: the suppressed ones are exactly
-         *     what you want to audit when the bot felt too quiet or too noisy.
+         * @description Trigger decisions for an incident, newest first
          */
         get: operations["list_triggers_api_v1_incidents__incident_id__triggers_get"];
         put?: never;
@@ -462,9 +428,6 @@ export interface paths {
         /**
          * List Incident Approvals
          * @description Approval requests, newest first.
-         *
-         *     Pending ones are the actionable list: each represents a branch of an
-         *     investigation waiting on a human.
          */
         get: operations["list_incident_approvals_api_v1_incidents__incident_id__approvals_get"];
         put?: never;
@@ -505,10 +468,6 @@ export interface paths {
         /**
          * Get Incident Usage
          * @description Token spend for an incident, per run and per agent, against its budget.
-         *
-         *     No USD anywhere: the provider reports token usage only, and inventing
-         *     a price from a public rate card would be a number people plan with and we
-         *     cannot stand behind.
          */
         get: operations["get_incident_usage_api_v1_incidents__incident_id__usage_get"];
         put?: never;
@@ -529,10 +488,6 @@ export interface paths {
         /**
          * Export
          * @description Everything the product holds about this incident, as one JSON document.
-         *
-         *     Serves both the postmortem-record use and the "show me my data" use on
-         *     purpose: an export that shows less than the dashboard would be a lie by
-         *     omission, and maintaining two extractors guarantees they diverge.
          */
         get: operations["export_api_v1_incidents__incident_id__export_get"];
         put?: never;
@@ -563,6 +518,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/incidents/{incident_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Status
+         * @description Move the incident status: open | mitigating | monitoring | resolved | closed.
+         */
+        post: operations["set_status_api_v1_incidents__incident_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/incidents/{incident_id}/investigate": {
         parameters: {
             query?: never;
@@ -575,9 +550,6 @@ export interface paths {
         /**
          * Investigate
          * @description Queue a manual, targeted, read-only run.
-         *
-         *     202, not 200: the run executes on the worker. Returning only once it
-         *     finished would hold the request open for the whole investigation budget.
          */
         post: operations["investigate_api_v1_incidents__incident_id__investigate_post"];
         delete?: never;
@@ -695,10 +667,6 @@ export interface paths {
         /**
          * Generate Comms
          * @description Write the next version of one audience's draft.
-         *
-         *     Drafting is not sending, and this endpoint is not a send button: it appends
-         *     a ``comms_drafts`` row. Nothing in the comms package can reach Slack, email
-         *     or a status page.
          */
         post: operations["generate_comms_api_v1_incidents__incident_id__comms_generate_post"];
         delete?: never;
@@ -758,12 +726,7 @@ export interface paths {
         put?: never;
         /**
          * Decide
-         * @description Approve or reject a gated recommendation.
-         *
-         *     Approval **records intent only**. It flips the approval row and the
-         *     mitigation's status and releases the paused branch so it can finish
-         *     recording the outcome — it never applies the mitigation, and there is no
-         *     adapter it could apply one with.
+         * @description Approve or reject a gated recommendation
          */
         post: operations["decide_api_v1_incidents__incident_id__approvals__approval_id__post"];
         delete?: never;
@@ -961,21 +924,14 @@ export interface components {
             /** Tool Calls */
             tool_calls?: components["schemas"]["ToolCallRead"][];
         };
-        /**
-         * ApprovalDecision
-         * @description ``{decision: approved|rejected, note?}`` — ``POST /approvals/{id}``.
-         */
+        /** ApprovalDecision */
         ApprovalDecision: {
             /** Decision */
             decision: string;
             /** Note */
             note?: string | null;
         };
-        /**
-         * ApprovalRead
-         * @description An approval request. ``status`` is the whole point: pending blocks a
-         *     branch, and a decision records human intent — never an execution.
-         */
+        /** ApprovalRead */
         ApprovalRead: {
             /**
              * Id
@@ -1009,10 +965,7 @@ export interface components {
              */
             created_at: string;
         };
-        /**
-         * CommsDraftPatch
-         * @description A human's edit. Saved as a new version, never over the old text.
-         */
+        /** CommsDraftPatch */
         CommsDraftPatch: {
             /** Body */
             body: string;
@@ -1062,10 +1015,7 @@ export interface components {
             /** Version */
             version?: number | null;
         };
-        /**
-         * CommsGenerate
-         * @description ``{audience}`` — write the next version of one audience's draft.
-         */
+        /** CommsGenerate */
         CommsGenerate: {
             /** Audience */
             audience: string;
@@ -1167,10 +1117,6 @@ export interface components {
         /**
          * ErasureRequest
          * @description ``DELETE /incidents/{id}`` body — deletion needs a stated reason.
-         *
-         *     A free-text reason is not bureaucracy: this is the only endpoint in the
-         *     product that destroys memory, and the tombstone it writes is the only
-         *     record that will remain.
          */
         ErasureRequest: {
             /** Detail */
@@ -1529,11 +1475,7 @@ export interface components {
         };
         /**
          * IncidentUsage
-         * @description Token spend for an incident against its budget.
-         *
-         *     ``near_cap`` mirrors what the provider reports for the account-wide budget,
-         *     so the dashboard can render an approaching per-incident ceiling and an
-         *     approaching provider ceiling the same way.
+         * @description Token spend for an incident against its budget
          */
         IncidentUsage: {
             /**
@@ -1902,6 +1844,11 @@ export interface components {
             /** Tokens Out */
             tokens_out: number;
         };
+        /** StatusUpdate */
+        StatusUpdate: {
+            /** Status */
+            status: string;
+        };
         /** SummaryRead */
         SummaryRead: {
             /**
@@ -2028,10 +1975,6 @@ export interface components {
         /**
          * TriggerRead
          * @description One trigger decision, with the reasons that produced it.
-         *
-         *     Exposed because "why did/didn't the bot investigate that message?" has to
-         *     be answerable without reading logs — the reasons list carries both the
-         *     novelty verdicts and any classifier commentary.
          */
         TriggerRead: {
             /**
@@ -2129,28 +2072,6 @@ export interface operations {
         };
     };
     slack_events_slack_events_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    slack_commands_route_slack_commands_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2998,6 +2919,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ModeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_status_api_v1_incidents__incident_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Flare-Actor"?: string | null;
+            };
+            path: {
+                incident_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdate"];
             };
         };
         responses: {

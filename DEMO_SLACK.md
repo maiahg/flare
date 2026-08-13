@@ -194,10 +194,7 @@ priya:  @flare timeline
 > **One surface — `@flare`:** every action runs by mentioning the bot and every
 > answer posts *publicly* in the channel (there is no private/slash surface).
 > `@flare` handles the full command set — reads, `start`, `investigate`,
-> `validate`, `mode`, `correct`, `mitigation`, `status`, `draft-update`,
-> `postmortem`, `refresh`. Actions that used to pop a Slack dialog (e.g.
-> `draft-update`) instead post a dashboard link, since a mention carries no
-> `trigger_id` to open a modal.
+> `validate`, `mode`, `correct`, `mitigation`, `status`, `postmortem`.
 → leading hypothesis: **deploy #7788 shrank the orders-worker Redis connection
 pool 25→5**; evidence is the pool-exhaustion logs + blame on `redis.rb`;
 payments is healthy; the flag ramp and CSS deploy are noted but not causal.
@@ -262,12 +259,9 @@ Click **Confirm** on the #7788 hypothesis card (drives ranking and locks the
 postmortem's root cause to a human-confirmed claim).
 
 **Beat 8 — Comms draft**
-```
-priya:  @flare draft-update status
-```
-→ flare drafts the **status** update (external-safe: never shows unconfirmed
-hypotheses) and posts a dashboard link where you review, edit and submit it.
-flare never sends it for you.
+Open the incident on the dashboard and generate the **status** update from the
+Comms panel. flare drafts it (external-safe: never shows unconfirmed hypotheses)
+for you to review, edit and submit. flare never sends it for you.
 
 **Beat 9 — Recovery + lifecycle**
 Approving a mitigation (Beat 6/7) schedules a read-only **recovery watch**. With
@@ -296,7 +290,8 @@ priya:  @flare postmortem
 → drafted from memory; every claim cited; root cause = the human-confirmed #7788
 pool shrink. The **Decisions** section carries the rollback/pool-pin decisions
 from Beat 6 and the **Action items** section carries the three follow-ups from
-Beat 6b. Optional: `@flare mode active` earlier to show proactive refresh.
+Beat 6b. Optional: `@flare mode active` earlier to show proactive re-ranking as
+telemetry refreshes on its own.
 
 **Dashboard:** keep http://localhost:3000 open on the incident throughout —
 overview, runs, evidence, hypotheses and the postmortem all update live. (The
@@ -306,6 +301,5 @@ lives in the postmortem's Timeline section.)
 ### Command reference
 `start`, `investigate <what>`, `validate <claim>`, `correct "..."`,
 `mode <quiet|scribe|assist|active>`, `status <open|mitigating|monitoring|resolved|closed>`,
-`mitigation`, `draft-update <audience>`,
-`postmortem`, `refresh`, and reads
+`mitigation`, `postmortem`, and reads
 `hypotheses|evidence|questions|decisions|timeline|brief|dashboard`.

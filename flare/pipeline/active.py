@@ -83,7 +83,6 @@ async def active_refresh(ctx: dict, payload: dict[str, Any]) -> str:
     incident_id = uuid.UUID(payload["incident_id"])
     token = str(payload.get("token", ""))
     tick = int(payload.get("tick", 1))
-    manual = bool(payload.get("manual"))
     settings = get_settings()
 
     state = await _incident_state(incident_id)
@@ -94,47 +93,34 @@ async def active_refresh(ctx: dict, payload: dict[str, Any]) -> str:
         # The incident is resolved/closed — stop the loop and stop working.
         _logger.info("active loop stopping: incident is %s", status)
         return "stopped"
-    if not manual:
-        if mode != ACTIVE_MODE:
-            _logger.info("active loop stopping: mode is %s", mode)
-            return "stopped"
-        if not await owns_loop(incident_id, token, redis=get_redis()):
-            _logger.info("active loop stopping: token replaced or expired")
-            return "superseded"
+    if mode != ACTIVE_MODE:
+        _logger.info("active loop stopping: mode is %s", mode)
+        return "stopped"
+    if not await owns_loop(incident_id, token, redis=get_redis()):
+        _logger.info("active loop stopping: token replaced or expired")
+        return "superseded"
 
-    # A manual `@flare refresh` is an explicit ask: answer in-channel regardless
-    # of mode. The scheduled loop stays governed so active mode isn't chatty.
-    poster = (
-        _slack_poster(incident_id, channel, mode, force=True)
-        if manual
-        else await _governed(incident_id, channel, mode)
-    )
+    # The scheduled loop stays governed so active mode isn't chatty.
+    poster = await _governed(incident_id, channel, mode)
     try:
         run_id = await start_adaptive_run(
             incident_id,
             trigger={
-                "reason": "manual_refresh" if manual else "active_refresh",
+                "reason": "active_refresh",
                 "tick": tick,
                 "focus": "refresh telemetry and re-rank hypotheses",
                 "signals": [],
                 "messages": [],
             },
-            created_by=(
-                f"user:{payload['user_id']}"
-                if manual and payload.get("user_id")
-                else "scheduler"
-            ),
+            created_by="scheduler",
             poster=poster,
-            run_type="manual" if manual else "scheduled",
+            run_type="scheduled",
             agents=list(settings.active.agents),
             dashboard_url=_dashboard_url(incident_id),
         )
     except Exception:
         _logger.exception("active refresh tick %s failed", tick)
         run_id = None
-
-    if manual:
-        return str(run_id) if run_id else "degraded"
 
     async with get_sessionmaker()() as session:
         incident = await session.get(Incident, incident_id)

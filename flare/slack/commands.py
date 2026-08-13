@@ -3,10 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy import select
+
 from flare.approvals import mitigation_view
 from flare.config import get_settings
 from flare.db.session import get_sessionmaker
-from flare.models.claims import COMMS_AUDIENCES, TimelineEntry
+from flare.models.claims import TimelineEntry
 from flare.models.core import (
     INCIDENT_MODES,
     INCIDENT_SEVERITIES,
@@ -20,21 +22,15 @@ from flare.slack.incident_ops import (
     get_workspace_by_team,
     incident_for_channel,
 )
-from flare.slack.modals import SlackModals, loading_view
 from flare.slack.posting import SlackPoster, post_incident_card
 from flare.steering import SteeringService, slack_actor
 from flare.worker.enqueue import (
-    enqueue_active_refresh as enqueue_refresh,
-)
-from flare.worker.enqueue import (
     enqueue_adaptive_run,
     enqueue_claim_verification,
-    enqueue_comms_draft,
     enqueue_correction,
     enqueue_initial_run,
     enqueue_postmortem,
 )
-from sqlalchemy import select
 
 _TIMELINE_N = 10
 
@@ -47,9 +43,7 @@ _USAGE = (
     "`@flare correct \"what's wrong\"`, "
     "`@flare mode <quiet|scribe|assist|active>`, "
     "`@flare status <open|mitigating|monitoring|resolved|closed>`, "
-    "`@flare mitigation`, "
-    "`@flare draft-update <internal|support|status|exec>`, `@flare postmortem`, "
-    "`@flare refresh`, or a read: "
+    "`@flare mitigation`, `@flare postmortem`, or a read: "
     "`@flare hypotheses|evidence|questions|decisions|timeline|brief|dashboard`"
 )
 
@@ -85,7 +79,6 @@ async def handle_mention(
         channel_name=channel_name,
         team_id=team_id,
         user_id=user_id,
-        trigger_id=None,
     )
     # Force the answer visible to everyone — the whole point of the mention.
     result["response_type"] = "in_channel"
@@ -104,7 +97,6 @@ async def handle(
     channel_name: str | None = None,
     team_id: str = "",
     user_id: str | None = None,
-    trigger_id: str | None = None,
 ) -> dict[str, Any]:
     cmd = parse(command_text)
     if cmd.action == "start":
@@ -140,21 +132,9 @@ async def handle(
         return await _handle_mitigation(
             channel_id=channel_id, team_id=team_id, user_id=user_id
         )
-    if cmd.action == "refresh":
-        return await _handle_refresh(
-            channel_id=channel_id, team_id=team_id, user_id=user_id
-        )
     if cmd.action == "postmortem":
         return await _handle_postmortem(
             channel_id=channel_id, team_id=team_id, user_id=user_id
-        )
-    if cmd.action == "draft-update":
-        return await _handle_draft_update(
-            cmd.args,
-            channel_id=channel_id,
-            team_id=team_id,
-            user_id=user_id,
-            trigger_id=trigger_id,
         )
     if cmd.action in _READ_COMMANDS:
         return await _handle_read(
@@ -226,6 +206,7 @@ async def _handle_start(
             channel=channel_id,
             title=parsed.title,
             severity=parsed.severity,
+            dashboard_url=_dashboard_url(incident_id),
         )
     except Exception: 
         thread_ts = None
@@ -379,27 +360,6 @@ async def _handle_mitigation(
         )
 
 
-async def _handle_refresh(
-    *, channel_id: str, team_id: str, user_id: str | None
-) -> dict[str, Any]:
-    """`@flare refresh` — re-read telemetry and re-rank hypotheses now."""
-    async with get_sessionmaker()() as session:
-        incident = await incident_for_channel(session, channel_id, team_id=team_id)
-        if incident is None:
-            return _ephemeral("No flare incident is tracking this channel.")
-        incident_id = incident.id
-    await enqueue_refresh(
-        {
-            "incident_id": str(incident_id),
-            "token": "",
-            "tick": 0,
-            "manual": True,
-            "user_id": user_id,
-        }
-    )
-    return _ephemeral(":arrows_counterclockwise: Refreshing telemetry and re-ranking hypotheses…")
-
-
 async def _handle_postmortem(
     *, channel_id: str, team_id: str, user_id: str | None
 ) -> dict[str, Any]:
@@ -415,52 +375,6 @@ async def _handle_postmortem(
     return _ephemeral(
         ":memo: Writing the postmortem draft from memory — every claim links to "
         f"its evidence. It will appear at {_dashboard_url(incident_id)}"
-    )
-
-
-async def _handle_draft_update(
-    args: list[str],
-    *,
-    channel_id: str,
-    team_id: str,
-    user_id: str | None,
-    trigger_id: str | None,
-) -> dict[str, Any]:
-    audience = (args[0].lower() if args else "").strip()
-    if audience not in COMMS_AUDIENCES:
-        return _ephemeral(
-            f"Usage: `@flare draft-update <{'|'.join(COMMS_AUDIENCES)}>`"
-        )
-
-    async with get_sessionmaker()() as session:
-        incident = await incident_for_channel(session, channel_id, team_id=team_id)
-        if incident is None:
-            return _ephemeral("No flare incident is tracking this channel.")
-        incident_id = incident.id
-
-    view_id: str | None = None
-    if trigger_id:
-        try:
-            view_id = await SlackModals().open(
-                trigger_id=trigger_id,
-                view=loading_view(incident_id=incident_id, audience=audience),
-            )
-        except Exception:  # noqa: BLE001 - dev may have no bot token
-            view_id = None
-
-    await enqueue_comms_draft(
-        {
-            "incident_id": str(incident_id),
-            "audience": audience,
-            "view_id": view_id,
-            "user_id": user_id,
-        }
-    )
-    if view_id:
-        return {}
-    return _ephemeral(
-        f"Drafting the *{audience}* update — it will appear at "
-        f"{_dashboard_url(incident_id)}. Flare never sends it for you."
     )
 
 
@@ -508,5 +422,13 @@ async def _handle_timeline(session: Any, incident: Incident, url: str) -> dict[s
     )
     if not rows:
         return _ephemeral(f"No timeline entries yet. Dashboard: {url}")
-    lines = "\n".join(f"• {r.description}" for r in rows)
+    lines = "\n".join(f"• [{_fmt_ts(r)}] {r.description}" for r in rows)
     return _ephemeral(f"*Latest timeline*\n{lines}\n\nFull dashboard: {url}")
+
+
+def _fmt_ts(entry: TimelineEntry) -> str:
+    """Best-effort UTC timestamp for a timeline entry."""
+    ts = entry.occurred_at or entry.created_at
+    if ts is None:
+        return "unknown"
+    return ts.strftime("%Y-%m-%d %H:%M UTC")
